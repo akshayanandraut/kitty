@@ -9,6 +9,7 @@ const dataFile = join(root, 'data', 'kitty.json');
 const host = '127.0.0.1';
 const port = Number(process.env.PORT || 4173);
 const demo = process.env.KITTY_LOCAL_DEMO === '1' && process.env.VERCEL !== '1';
+const hostedPreview = process.env.KITTY_HOSTED_PREVIEW === '1' && !demo;
 let state;
 let transaction = Promise.resolve();
 
@@ -58,7 +59,7 @@ function safeUser(x) { return { id: x.id, name: x.name, selfAttestedWoman: x.sel
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${host}:${port}`);
-    if (req.method === 'GET' && url.pathname === '/api/status') return json(res, 200, { mode: demo ? 'local_synthetic_demo' : 'unconfigured', sso: false, verification: false, payments: false, price: { amountPaise: 69900, currency: 'INR', schedule: 'one_time', access: 'lifetime_after_activation' } });
+    if (req.method === 'GET' && url.pathname === '/api/status') return json(res, 200, { mode: demo ? 'local_synthetic_demo' : hostedPreview ? 'hosted_preview' : 'unconfigured', sso: false, verification: false, payments: false, price: { amountPaise: 69900, currency: 'INR', schedule: 'one_time', access: 'lifetime_after_activation' } });
     if (url.pathname.startsWith('/api/')) {
       sameOrigin(req);
       if (!demo) throw new core.KittyError('service_unconfigured', 503);
@@ -107,9 +108,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method !== 'GET') throw new core.KittyError('route_not_found', 404);
     const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
-    if (!['index.html', 'app.js', 'style.css'].includes(file)) throw new core.KittyError('route_not_found', 404);
+    if (!['index.html', 'app.js', 'style.css', 'kitty-mark.svg'].includes(file)) throw new core.KittyError('route_not_found', 404);
     const content = await readFile(join(root, 'public', file));
-    res.writeHead(200, { 'content-type': file.endsWith('.js') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'", 'x-content-type-options': 'nosniff' });
+    res.writeHead(200, { 'content-type': file.endsWith('.js') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.svg') ? 'image/svg+xml' : 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'", 'x-content-type-options': 'nosniff' });
     res.end(content);
   } catch (error) {
     json(res, error.status || 500, { error: error instanceof core.KittyError ? error.code : 'internal_error' });

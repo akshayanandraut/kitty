@@ -6,6 +6,8 @@ Run `npm test`, then `npm run dev` and open `http://127.0.0.1:4173`. Local demo 
 
 Production requests fail closed until Grasany PKCE SSO, dedicated Supabase persistence, central identity verification, the approved one-time payment contract, and exact hosting/domain configuration are connected and tested. Identity verification does not establish gender or safety. Women-only eligibility is self-attested and subject to moderation.
 
+`npm run build` prepares the public Vercel preview in `dist/`. The hosted `/api/status` function declares account access, verification, group operations and checkout closed. The public page describes planned workflows but does not accept real member data. Git auto-deploy is disabled so publication uses a reviewed, explicit deployment to Kitty's single Vercel project.
+
 ## Current local flows
 
 - Public discovery shows only opt-in public group summaries and available slots.
