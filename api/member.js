@@ -4,9 +4,10 @@ import apply from '../lib/member-routes/apply.js';
 import review from '../lib/member-routes/review.js';
 import vote from '../lib/member-routes/vote.js';
 import override from '../lib/member-routes/override.js';
+import photo from '../lib/member-routes/photo.js';
 import { json } from '../lib/member-api.js';
 
-const routes = { profile, create, apply, review, vote, override };
+const routes = { profile, photo, create, apply, review, vote, override };
 
 export default async function handler(req, res) {
   const route = req.query?.route;

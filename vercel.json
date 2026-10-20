@@ -7,6 +7,7 @@
     { "source": "/auth/start", "destination": "/api/auth/start" },
     { "source": "/auth/callback", "destination": "/api/auth/callback" },
     { "source": "/api/account/profile", "destination": "/api/member?route=profile" },
+    { "source": "/api/account/photo", "destination": "/api/member?route=photo" },
     { "source": "/api/groups/:route", "destination": "/api/member?route=:route" }
   ],
   "headers": [

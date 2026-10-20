@@ -148,6 +148,7 @@ function renderHosted(status){
       }
       const needsAttestation = !member.adultAttested || !member.womenOnlyAttested;
       gate.innerHTML = `<strong>Welcome, ${esc(member.name)}.</strong><p>Your account is signed in. Circle access opens only after the required verification and payment approvals.</p>${needsAttestation ? '<label class="check"><input type="checkbox" id="attest-adult"> I confirm I am at least 18 years old.</label><label class="check"><input type="checkbox" id="attest-woman"> I self-attest that I am eligible for this women-only community.</label><button class="primary" id="save-attestation">Save my statements</button>' : `<p class="small muted">Identity: ${esc(member.identityStatus)} · Access: ${esc(member.accessStatus)}</p>`}<button class="text-btn" id="sign-out">Sign out</button>`;
+      if (!needsAttestation) renderHostedProfile();
       document.querySelector('#save-attestation')?.addEventListener('click', () => run(async () => {
         if (!document.querySelector('#attest-adult').checked || !document.querySelector('#attest-woman').checked) throw new Error('Both statements are required');
         await api('/account/attest', { adult: true, woman: true });
@@ -166,5 +167,38 @@ function renderHosted(status){
     section.innerHTML = `<p class="eyebrow">A peek inside</p><h2>Open to new connections</h2><p class="lead">Only host-approved public summaries appear here. Private venues, contacts, and money records stay inside each circle.</p><div class="grid">${sessions.map(s => `<article class="card"><span class="pill">Open meetup</span><h3>${esc(s.title)}</h3><p>${esc(s.theme)}</p><p class="meta">${date(s.startsAt)} · ${esc(s.city)} · ${esc(s.available)} places</p></article>`).join('')}${groups.map(g => `<article class="card"><span class="pill">Discoverable circle</span><h3>${esc(g.title)}</h3><p>${esc(g.description)}</p><p class="meta">${esc(g.city)} · ${esc(g.available)} places · Typical ${rupees(g.avgMonthlyCostPaise)} / month · Extras split among ${esc(g.expenseSplitBasis)}</p></article>`).join('')}</div>`;
     content.appendChild(section);
   }).catch(() => {});
+}
+async function renderHostedProfile(){
+  const mount = document.createElement('section');
+  mount.className = 'card hosted-profile';
+  content.querySelector('.hosted-layout').after(mount);
+  try {
+    const { profile } = await api('/account/profile');
+    mount.innerHTML = `<h2>Your private profile</h2><p class="small muted">Your details are shared with a circle's verified reviewers only after you apply and agree to share them. A new photo cancels open applications so you can review what is shared.</p><form class="form-grid"><label>About you<textarea name="bio" maxlength="500">${esc(profile.bio)}</textarea></label><label>Instagram<input name="instagram" maxlength="40" value="${esc(profile.socials.instagram)}"></label><label>Facebook<input name="facebook" maxlength="40" value="${esc(profile.socials.facebook)}"></label><label>Snapchat<input name="snapchat" maxlength="40" value="${esc(profile.socials.snapchat)}"></label><button class="primary" type="submit">Save introduction</button></form><div class="photo-control"><strong>Photo with your face</strong>${profile.hasPhoto ? '<img src="/api/account/photo" alt="Your private profile photo">' : '<p class="small muted">No photo added yet.</p>'}<label class="small">Choose a JPEG, PNG or WebP image, up to 2 MB<input type="file" accept="image/jpeg,image/png,image/webp"></label><button class="secondary" id="upload-photo" type="button">Save photo privately</button></div><p class="small muted">WhatsApp verification: ${profile.whatsappVerified ? 'verified' : 'waiting for a configured verification provider'}. Kitty does not label an unverified number as verified.</p>`;
+    mount.querySelector('form').onsubmit = event => { event.preventDefault(); run(async () => { const f = Object.fromEntries(new FormData(event.currentTarget)); await api('/account/profile', f); notice('Introduction saved'); }); };
+    mount.querySelector('#upload-photo').onclick = () => run(async () => {
+      const file = mount.querySelector('input[type="file"]').files?.[0];
+      if (!file || file.size > 2_097_152) throw new Error('Choose a photo up to 2 MB');
+      const encoded = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(file); });
+      await api('/account/photo', { imageBase64: encoded });
+      notice('Photo saved privately');
+      mount.remove();
+      renderHostedProfile();
+    });
+    if (profile.hasPhoto) {
+      const remove = document.createElement('button');
+      remove.className = 'text-btn';
+      remove.type = 'button';
+      remove.textContent = 'Remove my photo';
+      mount.querySelector('.photo-control').appendChild(remove);
+      remove.onclick = () => run(async () => {
+        const response = await fetch('/api/account/photo', { method: 'DELETE' });
+        if (!response.ok) throw new Error((await response.json()).error || 'photo_unavailable');
+        notice('Photo removed');
+        mount.remove();
+        renderHostedProfile();
+      });
+    }
+  } catch { mount.innerHTML = '<p>Profile editing is temporarily unavailable.</p>'; }
 }
 run(async()=>{const status=await api('/status');if(status.mode!=='local_synthetic_demo')return renderHosted(status);await refreshUsers();await render()});
