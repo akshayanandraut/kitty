@@ -148,7 +148,10 @@ function renderHosted(status){
       }
       const needsAttestation = !member.adultAttested || !member.womenOnlyAttested;
       gate.innerHTML = `<strong>Welcome, ${esc(member.name)}.</strong><p>Your account is signed in. Circle access opens only after the required verification and payment approvals.</p>${needsAttestation ? '<label class="check"><input type="checkbox" id="attest-adult"> I confirm I am at least 18 years old.</label><label class="check"><input type="checkbox" id="attest-woman"> I self-attest that I am eligible for this women-only community.</label><button class="primary" id="save-attestation">Save my statements</button>' : `<p class="small muted">Identity: ${esc(member.identityStatus)} · Access: ${esc(member.accessStatus)}</p>`}<button class="text-btn" id="sign-out">Sign out</button>`;
-      if (!needsAttestation) renderHostedProfile();
+      if (!needsAttestation) {
+        renderHostedProfile();
+        if (member.identityStatus === 'verified' && member.accessStatus === 'active') renderHostedWorkspace(member);
+      }
       document.querySelector('#save-attestation')?.addEventListener('click', () => run(async () => {
         if (!document.querySelector('#attest-adult').checked || !document.querySelector('#attest-woman').checked) throw new Error('Both statements are required');
         await api('/account/attest', { adult: true, woman: true });
@@ -200,5 +203,83 @@ async function renderHostedProfile(){
       });
     }
   } catch { mount.innerHTML = '<p>Profile editing is temporarily unavailable.</p>'; }
+}
+
+function hostedDialog(title, fields, save, refresh, action='Save') {
+  document.querySelector('#modal-content').innerHTML = `<h2>${esc(title)}</h2><div class="form-grid">${fields}</div>`;
+  document.querySelector('#submit').textContent = action;
+  modalForm.onsubmit = event => {
+    event.preventDefault();
+    run(async () => {
+      await save(Object.fromEntries(new FormData(modalForm)));
+      modal.close();
+      await refresh();
+    });
+  };
+  modal.showModal();
+}
+
+async function renderHostedWorkspace(member) {
+  content.querySelector('.hosted-workspace')?.remove();
+  const mount = document.createElement('section');
+  mount.className = 'hosted-workspace';
+  content.querySelector('.hosted-cards').before(mount);
+  mount.innerHTML = '<p class="loading">Loading your circles…</p>';
+  try {
+    const [home, publicData] = await Promise.all([api('/member?route=home'), api('/public')]);
+    const myGroups = home.groups || [];
+    const applications = home.applications || [];
+    const discoverable = publicData.groups || [];
+    mount.innerHTML = `<div class="section-head"><div><p class="eyebrow">Your Kitty space</p><h2>Circles and invitations</h2></div><button class="primary" id="hosted-create">Start a circle</button></div>
+      <p class="small muted">Your photo and social details remain private until you apply to a circle and agree to share a snapshot with its verified reviewers.</p>
+      <div class="grid">${myGroups.map(g => `<article class="card"><span class="pill">${esc(g.role)}</span><h3>${esc(g.title)}</h3><p>${esc(g.city)} · Typical ${rupees(g.avgMonthlyCostPaise)} / month</p><button class="text-btn" data-open-group="${g.id}">Open circle →</button></article>`).join('') || empty('No circles yet','You can start one or explore a discoverable circle.')}</div>
+      <div class="section-head"><h2>Your applications</h2></div><div class="list">${applications.map(a => `<div class="list-item"><div><strong>${esc(a.groupTitle)}</strong><small>${esc(a.status)}${a.reapplyAfter ? ` · May reapply after ${date(a.reapplyAfter)}` : ''}</small></div>${['requested','waitlisted'].includes(a.status) ? `<button class="text-btn" data-withdraw="${a.id}">Withdraw</button>` : ''}</div>`).join('') || empty('No applications','Apply to any circle that feels right for you.')}</div>
+      <div class="section-head"><h2>Discoverable circles</h2></div>${!home.profileReady ? '<div class="note">To apply, add a private face photo and complete WhatsApp verification. Applications remain closed until verification is configured.</div>' : ''}<div class="grid">${discoverable.map(g => `<article class="card"><span class="pill">${esc(g.city)}</span><h3>${esc(g.title)}</h3><p>${esc(g.description)}</p><p class="meta">${g.members} / ${g.limit} members · Typical ${rupees(g.avgMonthlyCostPaise)} / month · Extras: ${esc(g.expenseSplitBasis)}</p><button class="text-btn" data-apply-group="${g.id}" ${home.profileReady ? '' : 'disabled'}>Apply to join →</button></article>`).join('') || empty('No public circles yet','New circles will appear here when their hosts choose discoverability.')}</div>`;
+    mount.querySelector('#hosted-create').onclick = () => hostedDialog('Start a circle',
+      `${field('Circle name','title','text','maxlength="80"')}${textArea('About this circle','description','maxlength="500"')}${field('City or area','city','text','maxlength="80"')}<label>Member limit<input name="limit" type="number" min="2" max="100" value="8" required></label><label>Typical monthly cost in rupees<input name="monthlyCost" type="number" min="0" step="0.01" value="0" required></label><label>Extras split among<select name="expenseSplitBasis"><option value="members">Active members</option><option value="attendees">Meetup attendees who RSVP going</option></select></label><label>Visibility<select name="visibility"><option value="discoverable">Discoverable</option><option value="private">Private</option></select></label><label>Shared rules<textarea name="rules" maxlength="2000"></textarea></label>`,
+      async f => { await api('/member?route=create', { title:f.title, description:f.description, city:f.city, limit:Number(f.limit), avgMonthlyCostPaise:Math.round(Number(f.monthlyCost)*100), expenseSplitBasis:f.expenseSplitBasis, visibility:f.visibility, rules:f.rules }); notice('Circle created'); },
+      () => renderHostedWorkspace(member), 'Create circle');
+    mount.querySelectorAll('[data-open-group]').forEach(button => button.onclick = () => renderHostedGroup(button.dataset.openGroup, mount, member));
+    mount.querySelectorAll('[data-withdraw]').forEach(button => button.onclick = () => run(async () => { await api('/member?route=join-cancel', { requestId:button.dataset.withdraw }); notice('Application withdrawn'); await renderHostedWorkspace(member); }));
+    mount.querySelectorAll('[data-apply-group]').forEach(button => button.onclick = () => {
+      const group = discoverable.find(g => g.id === button.dataset.applyGroup);
+      hostedDialog(`Apply to ${group?.title || 'circle'}`,
+        `<p class="small">Typical monthly cost: ${rupees(group?.avgMonthlyCostPaise)}. Extras are split among ${esc(group?.expenseSplitBasis)}.</p><label class="check"><input type="checkbox" name="shareProfile" required> Share my current profile and private photo with this circle's verified reviewers for this application.</label>`,
+        async f => { await api('/member?route=apply', { groupId:button.dataset.applyGroup, shareProfile:f.shareProfile==='on' }); notice('Application shared for a member vote'); },
+        () => renderHostedWorkspace(member), 'Apply');
+    });
+  } catch { mount.innerHTML = '<p class="note">Your circles are temporarily unavailable.</p>'; }
+}
+
+async function renderHostedGroup(groupId, mount, member) {
+  mount.innerHTML = '<p class="loading">Opening your circle…</p>';
+  try {
+    const [{ group, members, events, expenses }, reviews, rejections] = await Promise.all([
+      api(`/member?route=group&groupId=${encodeURIComponent(groupId)}`),
+      api(`/member?route=review&groupId=${encodeURIComponent(groupId)}`).catch(() => null),
+      api(`/member?route=rejections&groupId=${encodeURIComponent(groupId)}`).catch(() => null),
+    ]);
+    const memberName = id => members.find(m => m.id === id)?.name || 'Member';
+    const refresh = () => renderHostedGroup(groupId, mount, member);
+    mount.innerHTML = `<button class="text-btn" id="hosted-back">← All circles</button><div class="section-head"><div><p class="eyebrow">Your circle</p><h2>${esc(group.title)}</h2><p class="small muted">${esc(group.city)} · ${members.length} / ${group.limit} members · Typical ${rupees(group.avgMonthlyCostPaise)} / month · Extras split among ${esc(group.expenseSplitBasis)}</p></div></div>
+      <div class="note">${esc(group.rules || 'No shared rules added yet.')} Private venue details appear only to members.</div>
+      <div class="section-head"><h2>Members</h2></div><div class="grid">${members.map(m => `<article class="card"><strong>${esc(m.name)}</strong><p class="small muted">${esc(m.role)}</p></article>`).join('')}</div>
+      <div class="section-head"><h2>Meetups</h2><button class="secondary" id="hosted-event">Plan meetup</button></div><div class="list">${events.map(e => `<div class="list-item"><div><strong>${esc(e.title)}</strong><small>${date(e.startsAt)} · ${esc(e.status)} · ${e.goingCount}/${e.capacity} going${e.location ? ` · ${esc(e.location)}` : ''}</small></div>${e.status==='scheduled' && new Date(e.startsAt) > new Date() ? `<div class="actions"><button class="text-btn" data-rsvp="${e.id}" data-response="going">Going</button><button class="text-btn" data-rsvp="${e.id}" data-response="maybe">Maybe</button><button class="text-btn" data-rsvp="${e.id}" data-response="not_going">Can't make it</button></div>` : ''}</div>`).join('') || empty('No meetups yet','Any active member can plan the next gathering.')}</div>
+      <div class="section-head"><h2>Shared extras</h2><button class="secondary" id="hosted-expense">Propose expense</button></div><p class="small muted">These are group records, not payments handled by Kitty. Every included member confirms their share before an expense is agreed.</p><div class="list">${expenses.map(e => { const mine=e.splits.find(s=>s.memberId===member.id); return `<div class="list-item"><div><strong>${esc(e.title)} · ${rupees(e.amountPaise)}</strong><small>${esc(e.status)} · Paid by ${esc(memberName(e.paidBy))} · ${e.splits.filter(s=>s.approved).length}/${e.splits.length} shares confirmed${mine ? ` · Your share ${rupees(mine.amountPaise)}` : ''}</small></div>${mine && ['proposed','agreed'].includes(e.status) ? `<div class="actions">${e.status==='proposed' && !mine.approved ? `<button class="primary" data-expense-approve="${e.id}">Confirm my share</button>` : ''}<button class="text-btn" data-expense-dispute="${e.id}">Question split</button></div>` : ''}</div>`; }).join('') || empty('Nothing to split yet','Add an extra cost when the group has agreed on a meetup or plan.')}</div>
+      <div class="section-head"><h2>Membership reviews</h2></div><div class="grid">${reviews ? (reviews.requests||[]).map(r => `<article class="card"><span class="pill">${esc(r.status)}</span><h3>${esc(r.profile.name)}</h3>${r.profile.photoUrl ? `<img class="review-photo" src="${esc(r.profile.photoUrl)}" alt="Applicant's shared profile photo">` : ''}<p>${esc(r.profile.bio || '')}</p><p class="small muted">Instagram: ${esc(r.profile.socials?.instagram || '—')} · Facebook: ${esc(r.profile.socials?.facebook || '—')} · Snapchat: ${esc(r.profile.socials?.snapchat || '—')} · WhatsApp: ${r.profile.whatsappVerified ? 'verified' : 'unverified'}</p><p class="small muted">${r.yesVotes}/${r.requiredVotes} yes votes needed · ${r.votes} votes cast</p>${r.mayVote ? `<div class="actions"><button class="primary" data-review-vote="${r.id}" data-approve="true">Welcome her</button><button class="secondary" data-review-vote="${r.id}" data-approve="false">Not this time</button></div>` : ''}</article>`).join('') || empty('No open reviews','Every eligible verified member can vote when someone applies.') : '<p class="note">Reviews are temporarily unavailable. Please try again shortly.</p>'}</div>
+      ${group.myRole==='host' ? `<div class="section-head"><h2>Reconsider a rejection</h2></div><div class="list">${rejections ? (rejections.requests||[]).map(r => `<div class="list-item"><div><strong>${esc(r.name)}</strong><small>Cooldown through ${date(r.reapplyAfter)}</small></div><button class="text-btn" data-override="${r.id}">Review override</button></div>`).join('') || empty('No current rejections','An override requires a recorded reason and an available place.') : '<p class="note">Rejection records are temporarily unavailable.</p>'}</div>` : ''}`;
+    mount.querySelector('#hosted-back').onclick = () => renderHostedWorkspace(member);
+    mount.querySelector('#hosted-event').onclick = () => hostedDialog('Plan a meetup',
+      `${field('Meetup title','title','text','maxlength="120"')}<label>Theme (optional)<input name="theme" maxlength="160"></label><label>Date and time<input name="startsAt" type="datetime-local" required></label><label>Places<input name="capacity" type="number" min="1" max="${group.limit}" value="${group.limit}" required></label><label>Private venue (optional)<input name="location" maxlength="300"></label><label>Reservation note (optional)<input name="reservation" maxlength="500"></label>`,
+      async f => { await api('/member?route=event-create', { groupId, title:f.title, theme:f.theme, startsAt:new Date(f.startsAt).toISOString(), timezone:Intl.DateTimeFormat().resolvedOptions().timeZone, capacity:Number(f.capacity), location:f.location, reservation:f.reservation }); notice('Meetup planned'); }, refresh, 'Plan meetup');
+    mount.querySelectorAll('[data-rsvp]').forEach(button => button.onclick = () => run(async () => { await api('/member?route=event-rsvp', { eventId:button.dataset.rsvp, response:button.dataset.response }); notice('RSVP saved'); await refresh(); }));
+    mount.querySelector('#hosted-expense').onclick = () => hostedDialog('Propose a shared extra',
+      `${field('Expense title','title','text','maxlength="120"')}${field('Amount in rupees','rupees','number','min="0.01" step="0.01"')}${group.expenseSplitBasis==='attendees' ? `<label>Meetup<select name="eventId" required>${events.filter(e=>e.status!=='cancelled').map(e=>`<option value="${e.id}">${esc(e.title)}</option>`).join('')}</select></label>` : ''}<p class="small muted">The included people are snapshotted when you propose this expense. Each confirms her own share.</p>`,
+      async f => { await api('/member?route=expense-propose', { groupId, title:f.title, amountPaise:Math.round(Number(f.rupees)*100), eventId:f.eventId || null }); notice('Expense proposed'); }, refresh, 'Propose expense');
+    mount.querySelectorAll('[data-expense-approve]').forEach(button => button.onclick = () => run(async () => { await api('/member?route=expense-decision', { expenseId:button.dataset.expenseApprove, approve:true }); notice('Your share confirmed'); await refresh(); }));
+    mount.querySelectorAll('[data-expense-dispute]').forEach(button => button.onclick = () => hostedDialog('Question this split', `<label>What should the group discuss?<textarea name="reason" maxlength="300" required></textarea></label>`, async f => { await api('/member?route=expense-decision', { expenseId:button.dataset.expenseDispute, approve:false, reason:f.reason }); notice('Split marked for discussion'); }, refresh, 'Flag for discussion'));
+    mount.querySelectorAll('[data-review-vote]').forEach(button => button.onclick = () => run(async () => { await api('/member?route=vote', { requestId:button.dataset.reviewVote, approve:button.dataset.approve==='true' }); notice('Your vote was recorded'); await refresh(); }));
+    mount.querySelectorAll('[data-override]').forEach(button => button.onclick = () => hostedDialog('Reconsider this application', `<p class="small muted">An override is logged and needs an available place. It should be used thoughtfully.</p><label>Reason<textarea name="reason" maxlength="300" required></textarea></label>`, async f => { await api('/member?route=override', { requestId:button.dataset.override, reason:f.reason }); notice('Override recorded'); }, refresh, 'Admit member'));
+  } catch { mount.innerHTML = '<p class="note">This circle is temporarily unavailable.</p><button class="text-btn" id="hosted-back">← All circles</button>'; mount.querySelector('#hosted-back').onclick = () => renderHostedWorkspace(member); }
 }
 run(async()=>{const status=await api('/status');if(status.mode!=='local_synthetic_demo')return renderHosted(status);await refreshUsers();await render()});
