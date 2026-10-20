@@ -17,6 +17,10 @@ import expenseDecision from '../lib/member-routes/expense-decision.js';
 import joinCancel from '../lib/member-routes/join-cancel.js';
 import rejections from '../lib/member-routes/rejections.js';
 import { splitEvenly } from '../lib/member-routes/group-shared.js';
+import { discoveryQuery, publicAreaPin } from '../lib/discovery.js';
+import { drawWinner, newDrawSeed, scheduledRound } from '../lib/bishi.js';
+import bishi from '../lib/member-routes/bishi.js';
+import locationUpdate from '../lib/member-routes/location-update.js';
 import sharp from 'sharp';
 
 function response() {
@@ -24,13 +28,13 @@ function response() {
 }
 
 test('production member routes reject anonymous reads and foreign-origin writes before database access', async () => {
-  for (const handler of [profile, photo, review, home, group, rejections]) {
+  for (const handler of [profile, photo, review, home, group, rejections, bishi]) {
     const res = response();
     await handler({ method: 'GET', headers: {}, query: {} }, res);
     assert.equal(res.statusCode, 401);
     assert.equal(res.body.error, 'sign_in_required');
   }
-  for (const handler of [profile, photo, create, apply, vote, override, eventCreate, eventRsvp, expensePropose, expenseDecision, joinCancel]) {
+  for (const handler of [profile, photo, create, apply, vote, override, eventCreate, eventRsvp, expensePropose, expenseDecision, joinCancel, locationUpdate, bishi]) {
     const res = response();
     await handler({ method: 'POST', headers: { origin: 'https://other.example' }, body: {} }, res);
     assert.equal(res.statusCode, 403);
@@ -39,6 +43,28 @@ test('production member routes reject anonymous reads and foreign-origin writes 
   const remove = response();
   await photo({ method: 'DELETE', headers: { origin: 'https://other.example' } }, remove);
   assert.equal(remove.statusCode, 403);
+});
+
+test('location search validates coordinates and stores an approximate area pin', () => {
+  assert.deepEqual(discoveryQuery({ search:'  Bandra   West  ' }), { search:'Bandra West', nearby:null });
+  assert.deepEqual(discoveryQuery({ lat:'19.12', lon:'72.88', radiusKm:'25' }), { search:'', nearby:{lat:19.12,lon:72.88,radiusKm:25} });
+  assert.deepEqual(publicAreaPin(19.12345,72.87654), { latitude:19.12, longitude:72.88 });
+  assert.throws(() => discoveryQuery({ lat:'91',lon:'72' }), /invalid_location/);
+  assert.throws(() => discoveryQuery({ lat:'19',lon:'' }), /invalid_location/);
+  assert.throws(() => discoveryQuery({ lat:'19',lon:'72',radiusKm:'500' }), /invalid_location/);
+});
+
+test('Bishi draw verifies its commitment and schedules month ends', () => {
+  const seed = newDrawSeed();
+  const people = ['00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002'];
+  const planId = '00000000-0000-4000-8000-000000000004';
+  const first = drawWinner(seed.secret,seed.commitment,planId,1,people);
+  assert.equal(drawWinner(seed.secret,seed.commitment,planId,1,[...people].reverse()), first);
+  assert.notEqual(drawWinner(seed.secret,seed.commitment,planId,2,people,[first]), first);
+  assert.throws(() => drawWinner(seed.secret,'0'.repeat(64),planId,1,people), /invalid_draw_seed/);
+  assert.equal(scheduledRound('2027-01-31','monthly',1),'2027-02-28');
+  assert.equal(scheduledRound('2027-01-31','monthly',2),'2027-03-31');
+  assert.equal(scheduledRound('2027-01-31','fortnightly',1),'2027-02-14');
 });
 
 test('shared costs add to the exact amount and reject duplicate or invalid participants', () => {

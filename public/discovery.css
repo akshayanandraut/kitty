@@ -1,0 +1,18 @@
+.hosted-public{margin:24px 0 38px}
+.hosted-public h2{font:600 32px Fraunces,Georgia,serif;margin:0 0 10px}
+.discovery-form{display:flex;align-items:end;gap:12px;flex-wrap:wrap;padding:16px;background:#fff;border:1px solid #eaded9;border-radius:17px;margin:20px 0 8px}
+.discovery-form label{display:grid;gap:6px;font-size:12px;font-weight:700;color:#684d56;flex:1;min-width:180px}
+.discovery-form label:has(select){flex:0 0 115px;min-width:115px}
+.discovery-form input,.discovery-form select{width:100%;padding:10px 12px;border:1px solid #d8c8c6;border-radius:10px;background:#fff;color:#35282b}
+.discovery-form .actions{padding-bottom:1px}
+.hosted-public #discovery-results{margin-top:18px}
+.public-area-control{margin:16px 0;padding:14px 16px;border:1px solid #ead4d8;background:#fffafc;border-radius:14px}
+.public-area-control p{margin:0 0 9px}
+.bishi-panel{margin:38px 0 8px;padding:22px;border-radius:20px;background:#fff8f1;border:1px solid #eedbc8}
+.bishi-panel .section-head:first-child{margin-top:0}
+.bishi-panel .list{margin:15px 0}
+.bishi-round{width:100%;margin:0}
+.bishi-round details{margin:10px 0;color:#746168;font-size:12px;overflow-wrap:anywhere}
+.bishi-contributions{display:grid;gap:6px;margin-top:16px}
+.bishi-contributions .list-item{padding:8px 12px;background:#fffaf7}
+@media(max-width:720px){.discovery-form{align-items:stretch}.discovery-form label,.discovery-form label:has(select){flex:1 1 100%}.discovery-form .actions{width:100%}}

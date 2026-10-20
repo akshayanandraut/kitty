@@ -1,24 +1,35 @@
 import { withKittyDatabase } from '../lib/db.js';
+import { discoveryQuery } from '../lib/discovery.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   if (req.method !== 'GET') return res.status(405).json({ error: 'method_not_allowed' });
+  let filters;
+  try { filters = discoveryQuery(req.query); }
+  catch (error) { return res.status(400).json({ error: error.message }); }
   try {
     const result = await withKittyDatabase(async client => {
+      const distance = `6371 * acos(least(1, greatest(-1,
+        sin(radians($2::double precision)) * sin(radians(g.public_latitude::double precision)) +
+        cos(radians($2::double precision)) * cos(radians(g.public_latitude::double precision)) *
+        cos(radians(g.public_longitude::double precision - $3::double precision)))))`;
       const groups = await client.query(`
         select g.id, g.title, g.description, g.public_city as city,
-               g.member_limit as member_limit,
+               g.public_area as area,g.member_limit as member_limit,
                g.avg_monthly_cost_paise, g.expense_split_basis,
-               count(m.id)::int as members
+               count(m.id)::int as members,
+               ${filters.nearby ? `${distance} as distance_km` : 'null::double precision as distance_km'}
         from kitty_private.groups g
         left join kitty_private.group_memberships m
           on m.group_id = g.id and m.status = 'active'
         where g.visibility = 'discoverable' and g.deleted_at is null
+          and ($1::text = '' or lower(g.public_city || ' ' || g.public_area || ' ' || g.title) like '%' || lower($1) || '%')
+          ${filters.nearby ? `and g.public_latitude is not null and ${distance} <= $4::double precision` : ''}
         group by g.id
-        order by g.created_at desc
-        limit 24
-      `);
+        order by ${filters.nearby ? 'distance_km asc,g.created_at desc' : 'g.created_at desc'}
+        limit 50
+      `, filters.nearby ? [filters.search,filters.nearby.lat,filters.nearby.lon,filters.nearby.radiusKm] : [filters.search]);
       const sessions = await client.query(`
         select e.id, e.group_id, e.title, e.theme, e.starts_at,
                g.title as group_title, g.public_city as city,
@@ -32,7 +43,7 @@ export default async function handler(req, res) {
         limit 24
       `);
       return {
-        groups: groups.rows.map(g => ({ id: g.id, title: g.title, description: g.description, city: g.city, members: g.members, limit: g.member_limit, available: Math.max(0, g.member_limit - g.members), avgMonthlyCostPaise: g.avg_monthly_cost_paise, expenseSplitBasis: g.expense_split_basis })),
+        groups: groups.rows.map(g => ({ id: g.id, title: g.title, description: g.description, city: g.city, area: g.area, distanceKm: g.distance_km === null ? null : Math.round(Number(g.distance_km) * 10) / 10, members: g.members, limit: g.member_limit, available: Math.max(0, g.member_limit - g.members), avgMonthlyCostPaise: g.avg_monthly_cost_paise, expenseSplitBasis: g.expense_split_basis })),
         sessions: sessions.rows.map(s => ({ id: s.id, groupId: s.group_id, title: s.title, theme: s.theme, startsAt: s.starts_at, groupTitle: s.group_title, city: s.city, available: Math.max(0, s.available) })),
       };
     });

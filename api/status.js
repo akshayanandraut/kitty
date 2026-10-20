@@ -1,5 +1,6 @@
 import { kittyDatabaseReady } from '../lib/db.js';
 import { clientId } from '../lib/auth.js';
+import { bishiEnabled } from '../lib/bishi.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -14,6 +15,7 @@ export default async function handler(req, res) {
     verification: false,
     payments: false,
     groups: false,
+    bishi: bishiEnabled(),
     price: { amountPaise: 69900, currency: 'INR', schedule: 'one_time', access: 'lifetime_after_activation' },
   });
 }
