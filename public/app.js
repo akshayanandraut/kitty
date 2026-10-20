@@ -163,7 +163,7 @@ function renderHosted(status){
     if (!groups.length && !sessions.length) return;
     const section = document.createElement('section');
     section.className = 'hosted-public';
-    section.innerHTML = `<p class="eyebrow">A peek inside</p><h2>Open to new connections</h2><p class="lead">Only host-approved public summaries appear here. Private venues, contacts, and money records stay inside each circle.</p><div class="grid">${sessions.map(s => `<article class="card"><span class="pill">Open meetup</span><h3>${esc(s.title)}</h3><p>${esc(s.theme)}</p><p class="meta">${date(s.startsAt)} · ${esc(s.city)} · ${esc(s.available)} places</p></article>`).join('')}${groups.map(g => `<article class="card"><span class="pill">Discoverable circle</span><h3>${esc(g.title)}</h3><p>${esc(g.description)}</p><p class="meta">${esc(g.city)} · ${esc(g.available)} places</p></article>`).join('')}</div>`;
+    section.innerHTML = `<p class="eyebrow">A peek inside</p><h2>Open to new connections</h2><p class="lead">Only host-approved public summaries appear here. Private venues, contacts, and money records stay inside each circle.</p><div class="grid">${sessions.map(s => `<article class="card"><span class="pill">Open meetup</span><h3>${esc(s.title)}</h3><p>${esc(s.theme)}</p><p class="meta">${date(s.startsAt)} · ${esc(s.city)} · ${esc(s.available)} places</p></article>`).join('')}${groups.map(g => `<article class="card"><span class="pill">Discoverable circle</span><h3>${esc(g.title)}</h3><p>${esc(g.description)}</p><p class="meta">${esc(g.city)} · ${esc(g.available)} places · Typical ${rupees(g.avgMonthlyCostPaise)} / month · Extras split among ${esc(g.expenseSplitBasis)}</p></article>`).join('')}</div>`;
     content.appendChild(section);
   }).catch(() => {});
 }

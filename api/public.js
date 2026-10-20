@@ -9,6 +9,7 @@ export default async function handler(req, res) {
       const groups = await client.query(`
         select g.id, g.title, g.description, g.public_city as city,
                g.member_limit as member_limit,
+               g.avg_monthly_cost_paise, g.expense_split_basis,
                count(m.id)::int as members
         from kitty_private.groups g
         left join kitty_private.group_memberships m
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
         limit 24
       `);
       return {
-        groups: groups.rows.map(g => ({ id: g.id, title: g.title, description: g.description, city: g.city, members: g.members, limit: g.member_limit, available: Math.max(0, g.member_limit - g.members) })),
+        groups: groups.rows.map(g => ({ id: g.id, title: g.title, description: g.description, city: g.city, members: g.members, limit: g.member_limit, available: Math.max(0, g.member_limit - g.members), avgMonthlyCostPaise: g.avg_monthly_cost_paise, expenseSplitBasis: g.expense_split_basis })),
         sessions: sessions.rows.map(s => ({ id: s.id, groupId: s.group_id, title: s.title, theme: s.theme, startsAt: s.starts_at, groupTitle: s.group_title, city: s.city, available: Math.max(0, s.available) })),
       };
     });
