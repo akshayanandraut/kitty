@@ -69,7 +69,7 @@ const server = http.createServer(async (req, res) => {
         return json(res, 201, { user: safeUser(await mutate(s => core.createUser(s, input))) });
       }
       const userId = actor(req);
-      if (req.method === 'GET' && url.pathname === '/api/me') return json(res, 200, { user: safeUser(state.users.find(x => x.id === userId)), memberships: state.memberships.filter(x => x.userId === userId && x.status === 'active').map(x => ({ ...x, group: state.groups.find(g => g.id === x.groupId)?.title })) });
+      if (req.method === 'GET' && url.pathname === '/api/me') { const own = state.users.find(x => x.id === userId); return json(res, 200, { user: { ...safeUser(own), identityStatus: own.identityStatus, profile: own.profile }, memberships: state.memberships.filter(x => x.userId === userId && x.status === 'active').map(x => ({ ...x, group: state.groups.find(g => g.id === x.groupId)?.title })) }); }
       if (req.method === 'GET' && url.pathname === '/api/discovery') return json(res, 200, { groups: core.discovery(state, userId) });
       if (req.method === 'GET' && url.pathname === '/api/open-sessions') return json(res, 200, { sessions: core.openSessions(state, userId) });
       if (req.method === 'POST' && url.pathname === '/api/suggest-session') return json(res, 200, { suggestion: core.suggestOpenSession(state, userId) });
@@ -80,8 +80,10 @@ const server = http.createServer(async (req, res) => {
       const input = await body(req);
       const routes = {
         '/api/groups': s => core.createGroup(s, userId, input),
-        '/api/join': s => core.requestJoin(s, userId, input.groupId),
+        '/api/join': s => core.requestJoin(s, userId, input.groupId, input.shareProfile),
         '/api/request/decide': s => core.decideRequest(s, userId, input.requestId, input.decision),
+        '/api/request/override': s => core.overrideRejection(s, userId, input.requestId, input.reason),
+        '/api/profile': s => core.updateProfile(s, userId, input),
         '/api/invite': s => core.invite(s, userId, input.groupId, input.targetId),
         '/api/invite/accept': s => core.acceptInvite(s, userId, input.invitationId),
         '/api/group/leave': s => core.leaveGroup(s, userId, input.groupId),
@@ -95,6 +97,7 @@ const server = http.createServer(async (req, res) => {
         '/api/rsvp': s => core.rsvp(s, userId, input.eventId, input.response),
         '/api/contributions': s => core.recordContribution(s, userId, input.groupId, input),
         '/api/expenses': s => core.createExpense(s, userId, input.groupId, input),
+        '/api/expenses/approve': s => core.approveExpense(s, userId, input.expenseId),
         '/api/settlements': s => core.recordSettlement(s, userId, input.groupId, input),
         '/api/settlements/confirm': s => core.confirmSettlement(s, userId, input.settlementId),
         '/api/report': s => core.reportUser(s, userId, input.targetId, input.groupId, input.reason),
@@ -108,7 +111,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method !== 'GET') throw new core.KittyError('route_not_found', 404);
     const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
-    if (!['index.html', 'app.js', 'style.css', 'kitty-mark.svg'].includes(file)) throw new core.KittyError('route_not_found', 404);
+    if (!['index.html', 'app.js', 'cat.js', 'style.css', 'motion.css', 'kitty-mark.svg'].includes(file)) throw new core.KittyError('route_not_found', 404);
     const content = await readFile(join(root, 'public', file));
     res.writeHead(200, { 'content-type': file.endsWith('.js') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.svg') ? 'image/svg+xml' : 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'", 'x-content-type-options': 'nosniff' });
     res.end(content);

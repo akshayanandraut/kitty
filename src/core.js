@@ -24,13 +24,13 @@ const activeCount = (state, groupId) => state.memberships.filter(x => x.groupId 
 const blocked = (state, a, b) => state.blocks.some(x => (x.actorId === a && x.targetId === b) || (x.actorId === b && x.targetId === a));
 
 export function initialState() {
-  return { users: [], groups: [], memberships: [], joinRequests: [], invitations: [], events: [], cycles: [], contributions: [], expenses: [], settlements: [], reports: [], blocks: [], audit: [] };
+  return { users: [], groups: [], memberships: [], joinRequests: [], joinVotes: [], invitations: [], events: [], cycles: [], contributions: [], expenses: [], settlements: [], reports: [], blocks: [], audit: [] };
 }
 
-export function createUser(state, { name, selfAttestedWoman, adultAttested, interests = [] }) {
+export function createUser(state, { name, selfAttestedWoman, adultAttested, syntheticVerified = false, interests = [] }) {
   if (selfAttestedWoman !== true) fail('eligibility_attestation_required');
   if (adultAttested !== true) fail('adult_attestation_required');
-  const user = { id: id(), name: required(name, 80), selfAttestedWoman: true, adultAttested: true, interests: distinct(interests.filter(x => typeof x === 'string').map(x => x.trim()).filter(Boolean)).slice(0, 12), createdAt: now(), contact: null, contactConsent: false, deletedAt: null };
+  const user = { id: id(), name: required(name, 80), selfAttestedWoman: true, adultAttested: true, identityStatus: syntheticVerified === true ? 'verified' : 'not_started', profile: { bio: '', socials: {}, photoId: null, whatsappVerified: false }, interests: distinct(interests.filter(x => typeof x === 'string').map(x => x.trim()).filter(Boolean)).slice(0, 12), createdAt: now(), contact: null, contactConsent: false, deletedAt: null };
   state.users.push(user); return user;
 }
 
@@ -39,7 +39,7 @@ export function createGroup(state, actorId, input) {
   if (!user?.selfAttestedWoman) fail('eligibility_required', 403);
   const title = required(input.title, 80);
   const limit = integer(input.limit, 2, 100);
-  const g = { id: id(), title, description: required(input.description, 500), city: required(input.city, 80), visibility: input.visibility === 'private' ? 'private' : 'discoverable', limit, rules: typeof input.rules === 'string' ? input.rules.trim().slice(0, 2000) : '', interestTags: distinct((input.interestTags || []).filter(x => typeof x === 'string').map(x => x.trim()).filter(Boolean)).slice(0, 8), contribution: input.contribution || { amountPaise: 0, cadence: 'none' }, createdAt: now(), deletedAt: null };
+  const g = { id: id(), title, description: required(input.description, 500), city: required(input.city, 80), visibility: input.visibility === 'private' ? 'private' : 'discoverable', limit, rules: typeof input.rules === 'string' ? input.rules.trim().slice(0, 2000) : '', interestTags: distinct((input.interestTags || []).filter(x => typeof x === 'string').map(x => x.trim()).filter(Boolean)).slice(0, 8), avgMonthlyCostPaise: integer(input.avgMonthlyCostPaise ?? 0), expenseSplitBasis: input.expenseSplitBasis === 'attendees' ? 'attendees' : 'members', contribution: input.contribution || { amountPaise: 0, cadence: 'none' }, createdAt: now(), deletedAt: null };
   state.groups.push(g);
   state.memberships.push({ id: id(), groupId: g.id, userId: actorId, role: 'host', status: 'active', joinedAt: now() });
   state.cycles ||= [];
@@ -49,7 +49,7 @@ export function createGroup(state, actorId, input) {
 }
 
 export function discovery(state, actorId) {
-  return state.groups.filter(g => g.visibility === 'discoverable' && !g.deletedAt && !state.memberships.some(m => m.groupId === g.id && blocked(state, actorId, m.userId))).map(g => ({ id: g.id, title: g.title, description: g.description, city: g.city, interestTags: g.interestTags, limit: g.limit, members: activeCount(state, g.id), available: Math.max(0, g.limit - activeCount(state, g.id)) }));
+  return state.groups.filter(g => g.visibility === 'discoverable' && !g.deletedAt && !state.memberships.some(m => m.groupId === g.id && blocked(state, actorId, m.userId))).map(g => ({ id: g.id, title: g.title, description: g.description, city: g.city, avgMonthlyCostPaise: g.avgMonthlyCostPaise || 0, expenseSplitBasis: g.expenseSplitBasis || 'members', interestTags: g.interestTags, limit: g.limit, members: activeCount(state, g.id), available: Math.max(0, g.limit - activeCount(state, g.id)) }));
 }
 
 export function openSessions(state, actorId) {
@@ -73,7 +73,9 @@ export function groupView(state, actorId, groupId) {
     const u = state.users.find(y => y.id === x.userId);
     return { userId: x.userId, name: u?.name || 'Former member', role: x.role, contact: u?.contactConsent && !blocked(state, actorId, x.userId) ? u.contact : null };
   });
-  return { ...g, members, available: Math.max(0, g.limit - members.length), cycle: currentCycle(state, groupId), events: state.events.filter(x => x.groupId === groupId), contributions: state.contributions.filter(x => x.groupId === groupId), expenses: state.expenses.filter(x => x.groupId === groupId), settlements: state.settlements.filter(x => x.groupId === groupId), joinRequests: isHost(state, groupId, actorId) ? state.joinRequests.filter(x => x.groupId === groupId && ['requested','waitlisted'].includes(x.status)) : undefined };
+  const canReview = state.users.find(x => x.id === actorId)?.identityStatus === 'verified';
+  const joinRequests = canReview ? state.joinRequests.filter(x => x.groupId === groupId && ['requested','waitlisted'].includes(x.status) && x.voterIds?.includes(actorId)).map(x => ({ ...x, votes: (state.joinVotes || []).filter(v => v.requestId === x.id).length, yesVotes: (state.joinVotes || []).filter(v => v.requestId === x.id && v.approve).length, requiredVotes: Math.ceil(x.voterIds.length / 2) })) : undefined;
+  return { ...g, members, available: Math.max(0, g.limit - members.length), cycle: currentCycle(state, groupId), events: state.events.filter(x => x.groupId === groupId), contributions: state.contributions.filter(x => x.groupId === groupId), expenses: state.expenses.filter(x => x.groupId === groupId), settlements: state.settlements.filter(x => x.groupId === groupId), joinRequests };
 }
 function currentCycle(state, groupId) { return (state.cycles || []).find(x => x.groupId === groupId && x.status === 'active') || null; }
 function addCycleParticipant(state, groupId, userId) {
@@ -81,15 +83,79 @@ function addCycleParticipant(state, groupId, userId) {
   if (cycle && !cycle.participants.some(x => x.userId === userId)) cycle.participants.push({ userId, joinedAt: now(), hostedEventId: null, exception: null, departedAt: null });
 }
 
-export function requestJoin(state, actorId, groupId) {
+export function updateProfile(state, actorId, input) {
+  const user = state.users.find(x => x.id === actorId && !x.deletedAt) || fail('user_not_found', 404);
+  const socials = {};
+  for (const site of ['instagram', 'facebook', 'snapchat']) {
+    const handle = String(input.socials?.[site] || '').trim().replace(/^@/, '');
+    if (handle && !/^[a-zA-Z0-9._-]{1,40}$/.test(handle)) fail('invalid_social_handle');
+    if (handle) socials[site] = handle;
+  }
+  const bio = String(input.bio || '').trim();
+  if (bio.length > 500) fail('invalid_bio');
+  user.profile = { ...(user.profile || {}), bio, socials };
+  return user.profile;
+}
+
+export function requestJoin(state, actorId, groupId, shareProfile = false) {
   const g = group(state, groupId);
   if (g.visibility !== 'discoverable') fail('invitation_required', 403);
+  if (shareProfile !== true) fail('profile_share_consent_required');
+  const applicant = state.users.find(x => x.id === actorId && !x.deletedAt) || fail('user_not_found', 404);
+  if (applicant.identityStatus !== 'verified') fail('identity_verification_required', 403);
   if (member(state, groupId, actorId)) fail('already_member');
   if (state.memberships.some(m => m.groupId === groupId && blocked(state, actorId, m.userId))) fail('blocked', 403);
   const prior = state.joinRequests.find(x => x.groupId === groupId && x.userId === actorId && ['requested','waitlisted'].includes(x.status));
   if (prior) return prior;
-  const item = { id: id(), groupId, userId: actorId, status: activeCount(state, groupId) < g.limit ? 'requested' : 'waitlisted', createdAt: now() };
+  const rejection = state.joinRequests.filter(x => x.groupId === groupId && x.userId === actorId && x.status === 'declined').sort((a,b) => String(b.decidedAt || '').localeCompare(String(a.decidedAt || '')))[0];
+  if (rejection?.reapplyAfter && rejection.reapplyAfter > now()) fail('reapply_cooldown', 403);
+  const voterIds = state.memberships.filter(m => m.groupId === groupId && m.status === 'active' && state.users.find(u => u.id === m.userId)?.identityStatus === 'verified').map(m => m.userId);
+  if (!voterIds.length) fail('no_verified_voters', 409);
+  const item = { id: id(), groupId, userId: actorId, status: activeCount(state, groupId) < g.limit ? 'requested' : 'waitlisted', voterIds, reviewProfile: { name: applicant.name, bio: applicant.profile?.bio || '', socials: { ...applicant.profile?.socials }, photoId: applicant.profile?.photoId || null, whatsappVerified: applicant.profile?.whatsappVerified === true }, createdAt: now() };
   state.joinRequests.push(item); return item;
+}
+
+export function voteJoinRequest(state, actorId, requestId, approve) {
+  const request = state.joinRequests.find(x => x.id === requestId) || fail('request_not_found', 404);
+  const g = group(state, request.groupId);
+  requireMember(state, g.id, actorId);
+  if (!['requested', 'waitlisted'].includes(request.status)) fail('request_stale', 409);
+  if (!request.voterIds?.includes(actorId) || state.users.find(x => x.id === actorId)?.identityStatus !== 'verified') fail('verified_voter_required', 403);
+  if (typeof approve !== 'boolean') fail('invalid_vote');
+  state.joinVotes ||= [];
+  if (state.joinVotes.some(x => x.requestId === requestId && x.voterId === actorId)) fail('already_voted', 409);
+  state.joinVotes.push({ requestId, voterId: actorId, approve, createdAt: now() });
+  const votes = state.joinVotes.filter(x => x.requestId === requestId);
+  const yes = votes.filter(x => x.approve).length;
+  if (yes >= Math.ceil(request.voterIds.length / 2)) {
+    if (activeCount(state, g.id) >= g.limit) request.status = 'waitlisted';
+    else if (state.memberships.some(m => m.groupId === g.id && blocked(state, request.userId, m.userId))) request.status = 'declined';
+    else {
+      state.memberships.push({ id: id(), groupId: g.id, userId: request.userId, role: 'member', status: 'active', joinedAt: now() });
+      addCycleParticipant(state, g.id, request.userId);
+      request.status = 'approved';
+    }
+  } else if (votes.length === request.voterIds.length) request.status = 'declined';
+  if (['approved', 'declined'].includes(request.status)) {
+    request.reviewProfile = null; request.decidedAt = now();
+    if (request.status === 'declined') { const cooldown = new Date(); cooldown.setUTCMonth(cooldown.getUTCMonth() + 3); request.reapplyAfter = cooldown.toISOString(); }
+  }
+  return { status: request.status, yesVotes: yes, requiredVotes: Math.ceil(request.voterIds.length / 2) };
+}
+
+export function overrideRejection(state, actorId, requestId, reason) {
+  const request = state.joinRequests.find(x => x.id === requestId) || fail('request_not_found', 404);
+  const g = group(state, request.groupId);
+  requireHost(state, g.id, actorId);
+  if (state.users.find(x => x.id === actorId)?.identityStatus !== 'verified') fail('verified_admin_required', 403);
+  if (request.status !== 'declined' || !request.reapplyAfter || request.reapplyAfter <= now()) fail('override_not_applicable', 409);
+  if (activeCount(state, g.id) >= g.limit) fail('group_full', 409);
+  if (state.memberships.some(m => m.groupId === g.id && blocked(state, request.userId, m.userId))) fail('blocked', 403);
+  state.memberships.push({ id: id(), groupId: g.id, userId: request.userId, role: 'member', status: 'active', joinedAt: now() });
+  addCycleParticipant(state, g.id, request.userId);
+  request.status = 'approved'; request.override = { by: actorId, reason: required(reason, 300), at: now() };
+  state.audit.push({ at: now(), actorId, groupId: g.id, action: 'join_rejection_overridden', requestId, reason: request.override.reason });
+  return request;
 }
 
 export function invite(state, actorId, groupId, targetId, ttlHours = 168) {
@@ -113,16 +179,8 @@ export function acceptInvite(state, actorId, invitationId) {
 }
 
 export function decideRequest(state, actorId, requestId, decision) {
-  const r = state.joinRequests.find(x => x.id === requestId) || fail('request_not_found', 404);
-  const g = group(state, r.groupId); requireHost(state, g.id, actorId);
-  if (!['requested','waitlisted'].includes(r.status)) fail('request_stale', 409);
-  if (decision === 'decline') { r.status = 'declined'; return r; }
-  if (decision !== 'approve') fail('invalid_decision');
-  if (activeCount(state, g.id) >= g.limit) { r.status = 'waitlisted'; return r; }
-  if (state.memberships.some(m => m.groupId === g.id && blocked(state, r.userId, m.userId))) fail('blocked', 403);
-  if (!member(state, g.id, r.userId)) state.memberships.push({ id: id(), groupId: g.id, userId: r.userId, role: 'member', status: 'active', joinedAt: now() });
-  addCycleParticipant(state, g.id, r.userId);
-  r.status = 'approved'; return r;
+  if (!['approve', 'decline'].includes(decision)) fail('invalid_decision');
+  return voteJoinRequest(state, actorId, requestId, decision === 'approve');
 }
 
 export function leaveGroup(state, actorId, groupId) {
@@ -241,14 +299,31 @@ export function splitPaise(amountPaise, participantIds) {
 
 export function createExpense(state, actorId, groupId, input) {
   requireMember(state, groupId, actorId);
+  const g = group(state, groupId);
   const paidBy = input.paidBy || actorId;
   requireMember(state, groupId, paidBy);
-  if (!Array.isArray(input.participantIds)) fail('invalid_participants');
-  for (const userId of input.participantIds) requireMember(state, groupId, userId);
+  let participantIds;
+  if ((g.expenseSplitBasis || 'members') === 'attendees') {
+    const event = state.events.find(x => x.id === input.eventId && x.groupId === groupId && x.status !== 'cancelled') || fail('event_required');
+    participantIds = Object.entries(event.rsvps).filter(([,response]) => response === 'going').map(([userId]) => userId);
+  } else participantIds = state.memberships.filter(x => x.groupId === groupId && x.status === 'active').map(x => x.userId);
+  if (!participantIds.length) fail('no_expense_participants');
+  for (const userId of participantIds) requireMember(state, groupId, userId);
   const amountPaise = integer(input.amountPaise, 1);
-  const splits = splitPaise(amountPaise, input.participantIds);
-  const item = { id: id(), groupId, title: required(input.title, 120), amountPaise, currency: 'INR', paidBy, splits, createdBy: actorId, createdAt: now() };
+  const splits = splitPaise(amountPaise, participantIds);
+  const item = { id: id(), groupId, eventId: input.eventId || null, splitBasis: g.expenseSplitBasis || 'members', title: required(input.title, 120), amountPaise, currency: 'INR', paidBy, splits, approvals: [], status: 'proposed', createdBy: actorId, createdAt: now() };
   state.expenses.push(item); return item;
+}
+
+export function approveExpense(state, actorId, expenseId) {
+  const item = state.expenses.find(x => x.id === expenseId) || fail('expense_not_found', 404);
+  requireMember(state, item.groupId, actorId);
+  if (item.status !== 'proposed') fail('expense_stale', 409);
+  if (!item.splits.some(x => x.userId === actorId)) fail('not_expense_participant', 403);
+  if (item.approvals.includes(actorId)) fail('already_approved', 409);
+  item.approvals.push(actorId);
+  if (item.splits.every(x => item.approvals.includes(x.userId))) { item.status = 'agreed'; item.agreedAt = now(); }
+  return { status: item.status, approvals: item.approvals.length, required: item.splits.length };
 }
 
 export function recordSettlement(state, actorId, groupId, input) {

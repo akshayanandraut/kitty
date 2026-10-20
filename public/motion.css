@@ -1,0 +1,73 @@
+
+/* Gentle motion on the hosted page. All movement is decorative. */
+body.hosted { overflow-x: clip; }
+.hosted .content {
+  position: relative;
+  isolation: isolate;
+}
+.hosted .content::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 1rem;
+  right: 0;
+  width: min(45vw, 33rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #efb5c055, #f9e1dc33 55%, transparent 72%);
+  filter: blur(18px);
+  animation: kitty-breathe 11s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+.hosted-intro .eyebrow { animation: kitty-enter .7s ease both; }
+.hosted-intro h1 { animation: kitty-enter .85s .08s ease both; }
+.hosted-intro .lead { animation: kitty-enter .85s .17s ease both; }
+.hosted-flags { animation: kitty-enter .85s .26s ease both; }
+.hosted-intro .note { animation: kitty-enter .85s .35s ease both; }
+.hosted-art { animation: kitty-art-enter 1s .1s cubic-bezier(.2,.8,.2,1) both; }
+.hosted-art img { animation: kitty-float 5.5s ease-in-out infinite; }
+.hosted-art .kitty-cat { width: 205px; height: 205px; filter: drop-shadow(0 20px 18px #8a385733); animation: kitty-float 5.5s ease-in-out infinite; }
+.kitty-pupil { transform: translate(var(--eye-x, 0px), var(--eye-y, 0px)); transition: transform .12s ease-out; }
+.kitty-cat.is-blinking .kitty-eye { transform-origin: center 81px; animation: kitty-blink .24s ease-out; }
+.art-stars { animation: kitty-twinkle 4s ease-in-out infinite; }
+.lipstick { animation: kitty-lipstick 6.5s ease-in-out infinite; }
+.hosted-cards .card { animation: kitty-enter .7s ease both; transition: transform .35s ease, box-shadow .35s ease, border-color .35s ease; }
+.hosted-cards .card:nth-child(1) { animation-delay: .42s; }
+.hosted-cards .card:nth-child(2) { animation-delay: .5s; }
+.hosted-cards .card:nth-child(3) { animation-delay: .58s; }
+.hosted-cards .card:hover { transform: translateY(-5px); box-shadow: 0 16px 36px #5433271c; border-color: #d9b8c1; }
+.hosted-foot { animation: kitty-enter .75s .65s ease both; }
+.hosted-public { border-top: 1px solid #ead9dd; padding: 2rem 0 3rem; }
+.hosted-public h2 { font: 600 clamp(27px, 3vw, 38px)/1.2 Fraunces, Georgia, serif; margin: 0 0 .4rem; }
+.hosted-public .grid { margin-top: 1.5rem; }
+.hosted-public .card { animation: kitty-enter .7s ease both; }
+.hosted-account { display: grid; justify-items: start; gap: .75rem; margin-top: 1.2rem; max-width: 40rem; }
+.hosted-account p { margin: 0; color: #75686a; line-height: 1.5; }
+.hosted-account .primary { display: inline-block; text-decoration: none; }
+.hosted-account .check { display: flex; gap: .6rem; align-items: flex-start; color: #654b55; font-size: .9rem; }
+@keyframes kitty-enter { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes kitty-art-enter { from { opacity: 0; transform: translateY(22px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes kitty-breathe { from { transform: translate3d(0, 0, 0) scale(.9); opacity: .6; } to { transform: translate3d(-3%, 5%, 0) scale(1.12); opacity: 1; } }
+@keyframes kitty-float { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-12px) rotate(2deg); } }
+@keyframes kitty-twinkle { 0%, 100% { opacity: .5; transform: rotate(-7deg) scale(.95); } 50% { opacity: 1; transform: rotate(7deg) scale(1.08); } }
+@keyframes kitty-lipstick { 0%, 100% { transform: rotate(-24deg) translateX(0); } 50% { transform: rotate(-24deg) translateX(9px); } }
+@keyframes kitty-blink { 50% { transform: scaleY(.08); } }
+@media(max-width:800px) { .hosted-art .kitty-cat { width: 150px; height: 150px; } }
+@media (prefers-reduced-motion: reduce) {
+  .hosted .content::before,
+  .hosted-intro .eyebrow,
+  .hosted-intro h1,
+  .hosted-intro .lead,
+  .hosted-flags,
+  .hosted-intro .note,
+  .hosted-art,
+  .hosted-art img,
+  .hosted-art .kitty-cat,
+  .kitty-cat.is-blinking .kitty-eye,
+  .art-stars,
+  .lipstick,
+  .hosted-cards .card,
+  .hosted-foot { animation: none !important; }
+  .hosted-cards .card { transition: none; }
+  .kitty-pupil { transition: none; transform: none; }
+}

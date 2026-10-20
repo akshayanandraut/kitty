@@ -3,6 +3,10 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "git": { "deploymentEnabled": { "main": false, "*": false } },
+  "rewrites": [
+    { "source": "/auth/start", "destination": "/api/auth/start" },
+    { "source": "/auth/callback", "destination": "/api/auth/callback" }
+  ],
   "headers": [
     { "source": "/(.*)", "headers": [
       { "key": "X-Content-Type-Options", "value": "nosniff" },
