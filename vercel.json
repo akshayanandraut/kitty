@@ -5,7 +5,9 @@
   "git": { "deploymentEnabled": { "main": false, "*": false } },
   "rewrites": [
     { "source": "/auth/start", "destination": "/api/auth/start" },
-    { "source": "/auth/callback", "destination": "/api/auth/callback" }
+    { "source": "/auth/callback", "destination": "/api/auth/callback" },
+    { "source": "/api/account/profile", "destination": "/api/member?route=profile" },
+    { "source": "/api/groups/:route", "destination": "/api/member?route=:route" }
   ],
   "headers": [
     { "source": "/(.*)", "headers": [
