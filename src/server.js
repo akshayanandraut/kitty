@@ -70,6 +70,8 @@ const server = http.createServer(async (req, res) => {
       const userId = actor(req);
       if (req.method === 'GET' && url.pathname === '/api/me') return json(res, 200, { user: safeUser(state.users.find(x => x.id === userId)), memberships: state.memberships.filter(x => x.userId === userId && x.status === 'active').map(x => ({ ...x, group: state.groups.find(g => g.id === x.groupId)?.title })) });
       if (req.method === 'GET' && url.pathname === '/api/discovery') return json(res, 200, { groups: core.discovery(state, userId) });
+      if (req.method === 'GET' && url.pathname === '/api/open-sessions') return json(res, 200, { sessions: core.openSessions(state, userId) });
+      if (req.method === 'POST' && url.pathname === '/api/suggest-session') return json(res, 200, { suggestion: core.suggestOpenSession(state, userId) });
       if (req.method === 'GET' && url.pathname === '/api/invitations') return json(res, 200, { invitations: state.invitations.filter(x => x.targetId === userId && x.status === 'pending').map(x => ({ ...x, groupTitle: state.groups.find(g => g.id === x.groupId)?.title })) });
       if (req.method === 'GET' && url.pathname === '/api/export') return json(res, 200, core.exportOwnData(state, userId));
       if (req.method === 'GET' && url.pathname.startsWith('/api/groups/')) return json(res, 200, { group: core.groupView(state, userId, url.pathname.split('/')[3]) });

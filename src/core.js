@@ -52,6 +52,20 @@ export function discovery(state, actorId) {
   return state.groups.filter(g => g.visibility === 'discoverable' && !g.deletedAt && !state.memberships.some(m => m.groupId === g.id && blocked(state, actorId, m.userId))).map(g => ({ id: g.id, title: g.title, description: g.description, city: g.city, interestTags: g.interestTags, limit: g.limit, members: activeCount(state, g.id), available: Math.max(0, g.limit - activeCount(state, g.id)) }));
 }
 
+export function openSessions(state, actorId) {
+  const visible = new Map(discovery(state, actorId).map(g => [g.id, g]));
+  return state.events.filter(e => e.scope === 'open' && e.status === 'scheduled' && e.startsAt > now() && visible.has(e.groupId)).map(e => {
+    const g = visible.get(e.groupId);
+    return { id: e.id, groupId: e.groupId, groupTitle: g.title, city: g.city, title: e.title, theme: e.theme, startsAt: e.startsAt, timezone: e.timezone, available: Math.max(0, Math.min(g.available, e.capacity - Object.values(e.rsvps).filter(x => x === 'going').length)) };
+  });
+}
+
+export function suggestOpenSession(state, actorId, random = Math.random) {
+  const sessions = openSessions(state, actorId).filter(e => e.available > 0);
+  if (!sessions.length) return null;
+  return sessions[Math.floor(random() * sessions.length)];
+}
+
 export function groupView(state, actorId, groupId) {
   const g = group(state, groupId);
   requireMember(state, groupId, actorId);

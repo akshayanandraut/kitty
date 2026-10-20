@@ -35,6 +35,18 @@ test('cross-group data is inaccessible and public discovery omits private detail
   assert.ok(!JSON.stringify(publicGroup).includes('synthetic@example.invalid'));
 });
 
+test('open session preview is opt-in and omits venue, reservation and member identities',()=>{
+  const s=k.initialState(), h=person(s,'Host'), stranger=person(s,'Stranger'), g=circle(s,h);
+  k.createEvent(s,h.id,g.id,{title:'Synthetic open tea',startsAt:'2030-10-01T10:00:00Z',scope:'open',theme:'Books',location:'Private address',reservation:'Secret booking'});
+  const preview=k.suggestOpenSession(s,stranger.id,()=>0);
+  assert.equal(preview.title,'Synthetic open tea');
+  assert.equal(preview.city,'Pune');
+  assert.ok(!JSON.stringify(preview).includes('Private address'));
+  assert.ok(!JSON.stringify(preview).includes('Secret booking'));
+  assert.ok(!JSON.stringify(preview).includes(h.name));
+  assert.throws(()=>k.groupView(s,stranger.id,g.id),/not_group_member/);
+});
+
 test('integer-paise splits are deterministic and total exactly',()=>{
   assert.deepEqual(k.splitPaise(100,['b','a','c']),[{userId:'a',amountPaise:34},{userId:'b',amountPaise:33},{userId:'c',amountPaise:33}]);
   assert.throws(()=>k.splitPaise(100,['a','a']),/invalid_participants/);
