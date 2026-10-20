@@ -1,0 +1,11 @@
+.git
+.vercel
+.env*
+data
+dist
+node_modules
+tests
+supabase
+src
+work
+outputs
