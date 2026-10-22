@@ -1,4 +1,4 @@
-import { callback, clientId, clearFlowCookie, cookie, equal, hash, issuer, randomToken, sessionCookie, validateIdentityToken } from '../../lib/auth.js';
+import { callback, clientId, clearFlowCookie, cookie, equal, hash, issuer, randomToken, sessionCookie, validAuthorizationTokens, validateIdentityToken } from '../../lib/auth.js';
 import { withKittyDatabase } from '../../lib/db.js';
 
 export default async function handler(req, res) {
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     });
     if (!tokenResponse.ok) throw new Error('token_exchange_failed');
     const tokens = await tokenResponse.json();
-    if (typeof tokens.id_token !== 'string') throw new Error('id_token_missing');
+    if (!validAuthorizationTokens(tokens)) throw new Error('token_response_invalid');
     const identity = await validateIdentityToken(tokens.id_token, flow.nonce);
     const session = randomToken();
     await withKittyDatabase(async client => {

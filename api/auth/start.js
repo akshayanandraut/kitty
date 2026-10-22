@@ -1,4 +1,4 @@
-import { issuer, callback, clientId, randomToken, hash, flowCookie } from '../../lib/auth.js';
+import { issuer, callback, clientId, randomToken, hash, flowCookie, authorizationScope } from '../../lib/auth.js';
 import { withKittyDatabase } from '../../lib/db.js';
 
 export default async function handler(req, res) {
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     target.searchParams.set('response_type', 'code');
     target.searchParams.set('client_id', id);
     target.searchParams.set('redirect_uri', callback);
-    target.searchParams.set('scope', 'openid email profile');
+    target.searchParams.set('scope', authorizationScope);
     target.searchParams.set('state', state);
     target.searchParams.set('nonce', nonce);
     target.searchParams.set('code_challenge', Buffer.from(hash(verifier), 'hex').toString('base64url'));
