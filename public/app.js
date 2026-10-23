@@ -138,7 +138,12 @@ function renderHosted(status){
   hostedSsoEnabled = status.sso === true;
   hostedMember = null;
   document.body.classList.add('hosted');
-  content.innerHTML=`<div class="hosted-layout"><section class="hosted-intro"><p class="eyebrow">Kitty by Grasany</p><h1>Good company, beautifully planned.</h1><p class="lead">A thoughtful space for women to bring existing kitty circles together, discover open meetups, take turns hosting, and keep shared plans clear.</p><div class="hosted-flags"><span>Women-only community</span><span>Private group spaces</span><span>One-time access plan</span></div><div class="note">Kitty is in a public product preview. Account registration, identity verification, group access, and checkout are closed while the dedicated services are being connected and tested.</div></section><div class="hosted-art"><div class="art-stars">✦ &nbsp; ✧ &nbsp; ✦</div><img src="/kitty-mark.svg" alt="Kitty cat emblem"><div class="art-line">A little charm. A lot of care.</div><div class="lipstick" aria-hidden="true"></div></div></div><div class="hosted-cards"><article class="card"><span class="eyebrow">01 · Gather</span><h3>Your circle, your pace</h3><p>Keep existing groups private, or open a meetup for new members with approval and capacity controls.</p></article><article class="card"><span class="eyebrow">02 · Host</span><h3>Take turns, beautifully</h3><p>Plan themes, dates, venues, reservations and RSVPs. Track each member's turn to host.</p></article><article class="card"><span class="eyebrow">03 · Keep clear</span><h3>Shared records</h3><p>See contributions, split expenses and settlement records without Kitty holding group money.</p></article></div><div class="hosted-foot"><strong>Planned access: ${rupees(status.price.amountPaise)} once, then lifetime access.</strong><span>No annual renewal or recurring mandate. Checkout is not open.</span></div><p class="small muted">Bishi pool tracking and draws are closed pending group-specific legal authorization. Kitty does not collect or transfer pooled funds.</p>`;
+  document.querySelector('.top-actions').innerHTML = '<nav class="hosted-nav" aria-label="Page sections"><a href="#discover">Find circles</a><a href="#how-it-works">How Kitty works</a></nav>';
+  const signIn = status.sso ? '<a class="primary hero-sign-in" href="/auth/start">Sign in with Grasany</a>' : '';
+  const previewMessage = status.sso
+    ? 'Grasany sign-in is configured. Profile, verification and access checks still protect every circle; checkout remains closed.'
+    : 'You can explore public circles now. Sign-in, verification, group access and checkout are being connected and tested.';
+  content.innerHTML=`<div class="hosted-layout"><section class="hosted-intro"><p class="eyebrow">Kitty by Grasany · A place to belong</p><h1>Good company, beautifully planned.</h1><p class="lead">For women who love the ritual of getting together. Find a circle nearby, make a little room for joy, and keep every plan beautifully clear.</p><div class="hero-actions"><a class="primary" href="#discover">Explore circles <span aria-hidden="true">↗</span></a>${signIn}<a class="text-btn" href="#how-it-works">See how it works ↓</a></div><div class="hosted-flags"><span>Women-only community</span><span>Private group spaces</span><span>Thoughtful hosting</span></div><div class="note preview-note" role="status"><strong>What is open today</strong><p>${previewMessage}</p></div></section><div class="hosted-art"><div class="art-stars">✦ &nbsp; ✧ &nbsp; ✦</div><img src="/kitty-mark.svg" alt="Illustrated Kitty cat emblem"><div class="art-line">A little charm. A lot of care.</div><div class="lipstick" aria-hidden="true"></div></div></div><div class="hosted-cards" id="how-it-works"><article class="card"><span class="eyebrow">01 · Discover</span><h3>Find your people</h3><p>Search by area or explore nearby. A circle appears publicly only when its host chooses to share a broad location.</p></article><article class="card"><span class="eyebrow">02 · Gather</span><h3>Keep it your circle</h3><p>Apply with your consent, meet the members, and plan dates, themes, venues and hosting turns together.</p></article><article class="card"><span class="eyebrow">03 · Keep clear</span><h3>Share the extras</h3><p>Agree on shared costs and track outside settlements. Kitty does not collect or hold group money.</p></article></div><div class="hosted-foot"><strong>Planned access: ${rupees(status.price.amountPaise)} once, then lifetime access.</strong><span>No annual renewal or recurring mandate. Checkout is not open.</span></div><p class="small muted">Bishi pool tracking and draws are closed pending group-specific legal authorization. Kitty does not collect or transfer pooled funds.</p>`;
   window.mountCatArt?.(content.querySelector('.hosted-art'));
   if (status.sso) {
     const gate = document.createElement('div');
@@ -150,8 +155,11 @@ function renderHosted(status){
         return;
       }
       hostedMember = member;
+      content.querySelector('.hero-sign-in')?.remove();
       const needsAttestation = !member.adultAttested || !member.womenOnlyAttested;
-      gate.innerHTML = `<strong>Welcome, ${esc(member.name)}.</strong><p>Your account is signed in. Circle access opens only after the required verification and payment approvals.</p>${needsAttestation ? '<label class="check"><input type="checkbox" id="attest-adult"> I confirm I am at least 18 years old.</label><label class="check"><input type="checkbox" id="attest-woman"> I self-attest that I am eligible for this women-only community.</label><button class="primary" id="save-attestation">Save my statements</button>' : `<p class="small muted">Identity: ${esc(member.identityStatus)} · Access: ${esc(member.accessStatus)}</p>`}<button class="text-btn" id="sign-out">Sign out</button>`;
+      if (!needsAttestation) document.querySelector('.hosted-nav').insertAdjacentHTML('beforeend', '<a href="#account-section">Your profile</a>');
+      if (!needsAttestation && member.identityStatus === 'verified' && member.accessStatus === 'active') document.querySelector('.hosted-nav').insertAdjacentHTML('beforeend', '<a href="#your-circles">Your circles</a>');
+      gate.innerHTML = `<strong>Welcome, ${esc(member.name)}.</strong><p>Your account is signed in. Circle access opens after Kitty's profile, verification and access requirements are met.</p>${needsAttestation ? '<label class="check"><input type="checkbox" id="attest-adult"> I confirm I am at least 18 years old.</label><label class="check"><input type="checkbox" id="attest-woman"> I self-attest that I am eligible for this women-only community.</label><button class="primary" id="save-attestation">Save my statements</button>' : `<p class="small muted">Identity: ${esc(member.identityStatus)} · Access: ${esc(member.accessStatus)}</p>`}<button class="text-btn" id="sign-out">Sign out</button>`;
       if (!needsAttestation) {
         renderHostedProfile();
         if (member.identityStatus === 'verified' && member.accessStatus === 'active') renderHostedWorkspace(member);
@@ -170,18 +178,37 @@ function renderHosted(status){
 function renderHostedDiscovery(){
   const section = document.createElement('section');
   section.className = 'hosted-public';
-  section.innerHTML = `<p class="eyebrow">A peek inside</p><h2>Find your circle</h2><p class="lead">Search by city, area or circle name. Nearby search uses your location only when you choose it. Public results never include private venues or members' locations.</p><form class="discovery-form"><label>City, area or circle<input name="search" maxlength="80" placeholder="Mumbai, Bandra, Pune…" autocomplete="off"></label><label>Within<select name="radiusKm"><option value="10">10 km</option><option value="25" selected>25 km</option><option value="50">50 km</option><option value="100">100 km</option></select></label><div class="actions"><button class="primary" type="submit">Search</button><button class="secondary" type="button" id="nearby-circles">Use my location</button></div></form><p class="small muted" id="discovery-hint">Nearby results require an approximate public area pin chosen by a circle's host.</p><div class="grid" id="discovery-results" aria-live="polite"><p class="loading">Finding circles…</p></div>`;
+  section.id = 'discover';
+  section.innerHTML = `<div class="section-head discovery-heading"><div><p class="eyebrow">A place for every gathering</p><h2>Find your circle</h2><p class="lead">Search by city, area or circle name. Nearby search uses your location only when you choose it. Public results never include private venues or members' locations.</p></div><span class="discovery-flower" aria-hidden="true">✳</span></div><form class="discovery-form" role="search"><label>City, area or circle<input name="search" maxlength="80" placeholder="Try Mumbai or Bandra" autocomplete="off"></label><label>Within<select name="radiusKm"><option value="10">10 km</option><option value="25" selected>25 km</option><option value="50">50 km</option><option value="100">100 km</option></select></label><div class="actions"><button class="primary" type="submit">Search circles</button><button class="secondary" type="button" id="nearby-circles">Near me</button></div></form><div class="discovery-meta"><p class="small muted" id="discovery-hint">Nearby results require a broad public area chosen by a circle's host.</p><p class="small" id="discovery-summary" role="status"></p></div><div class="grid" id="discovery-results" aria-live="polite"><p class="loading">Finding circles…</p></div>`;
   content.querySelector('.hosted-cards').before(section);
   const results = section.querySelector('#discovery-results');
+  const summary = section.querySelector('#discovery-summary');
+  let searchSequence = 0;
   const renderResults = ({ groups = [], sessions = [] }, nearby = false) => {
-    results.innerHTML = `${!nearby ? sessions.map(s => `<article class="card"><span class="pill">Open meetup</span><h3>${esc(s.title)}</h3><p>${esc(s.theme)}</p><p class="meta">${date(s.startsAt)} · ${esc(s.city)} · ${esc(s.available)} places</p></article>`).join('') : ''}${groups.map(g => `<article class="card"><span class="pill">Discoverable circle</span><h3>${esc(g.title)}</h3><p>${esc(g.description)}</p><p class="meta">${esc([g.area,g.city].filter(Boolean).join(', '))}${g.distanceKm !== null ? ` · About ${esc(g.distanceKm)} km away` : ''} · ${esc(g.available)} places · Typical ${rupees(g.avgMonthlyCostPaise)} / month</p><button class="text-btn" data-discovery-apply="${esc(g.id)}">Request to join →</button></article>`).join('')}` || empty('No circles found','Try another area or a wider distance.');
+    const count = groups.length + (nearby ? 0 : sessions.length);
+    summary.textContent = count ? `${count} ${count === 1 ? 'result' : 'results'} found` : 'No public results yet';
+    results.innerHTML = `${!nearby ? sessions.map(s => `<article class="card discovery-card"><span class="pill">Open meetup</span><h3>${esc(s.title)}</h3><p>${esc(s.theme)}</p><p class="meta">${date(s.startsAt)} · ${esc(s.city)} · ${esc(s.available)} places</p></article>`).join('') : ''}${groups.map(g => `<article class="card discovery-card"><span class="pill">Discoverable circle</span><h3>${esc(g.title)}</h3><p>${esc(g.description)}</p><p class="meta">${esc([g.area,g.city].filter(Boolean).join(', '))}${g.distanceKm !== null ? ` · About ${esc(g.distanceKm)} km away` : ''} · ${esc(g.available)} places · Typical ${rupees(g.avgMonthlyCostPaise)} / month</p>${hostedSsoEnabled ? `<button class="text-btn" data-discovery-apply="${esc(g.id)}">Request to join →</button>` : '<span class="small muted">Applications open after sign-in is ready.</span>'}</article>`).join('')}` || empty('No circles found','Try another area or a wider distance. New circles appear when hosts choose to share them publicly.');
     results.querySelectorAll('[data-discovery-apply]').forEach(button => button.onclick = () => {
-      if (!hostedMember) return hostedSsoEnabled ? window.location.assign('/auth/start') : notice('Sign-in is not open yet', true);
+      if (!hostedMember) return window.location.assign('/auth/start');
+      if (hostedMember.identityStatus !== 'verified' || hostedMember.accessStatus !== 'active') {
+        content.querySelector('#account-section')?.scrollIntoView({ behavior: 'smooth' });
+        return notice('Complete your profile and access checks before applying', true);
+      }
       const group = groups.find(g=>g.id===button.dataset.discoveryApply);
       hostedDialog(`Apply to ${group?.title || 'circle'}`, `<p class="small">Typical monthly cost: ${rupees(group?.avgMonthlyCostPaise)}.</p><label class="check"><input type="checkbox" name="shareProfile" required> Share my current profile and private photo with this circle's verified reviewers for this application.</label>`, async f=>{await api('/member?route=apply',{groupId:group.id,shareProfile:f.shareProfile==='on'});notice('Application shared for a member vote')}, async()=>{if(hostedMember.identityStatus==='verified' && hostedMember.accessStatus==='active')await renderHostedWorkspace(hostedMember)}, 'Apply');
     });
   };
-  const search = async query => { results.innerHTML = '<p class="loading">Finding circles…</p>'; try { renderResults(await api(`/public?${query}`), Boolean(query && query !== 'search=')); } catch { results.innerHTML = '<p class="note">Circle search is temporarily unavailable.</p>'; } };
+  const search = async (query, nearby = false) => {
+    const request = ++searchSequence;
+    results.innerHTML = '<p class="loading">Finding circles…</p>';
+    summary.textContent = 'Searching…';
+    try {
+      const data = await api(`/public?${query}`);
+      if (request === searchSequence) renderResults(data, nearby);
+    } catch {
+      if (request === searchSequence) { summary.textContent = ''; results.innerHTML = '<p class="note">Circle search is temporarily unavailable. Please try again.</p>'; }
+    }
+  };
   section.querySelector('form').onsubmit = event => { event.preventDefault(); const term = section.querySelector('[name="search"]').value.trim(); search(new URLSearchParams({ search:term }).toString()); };
   section.querySelector('#nearby-circles').onclick = () => {
     if (!navigator.geolocation) return notice('Location is unavailable on this device', true);
@@ -189,7 +216,7 @@ function renderHostedDiscovery(){
     navigator.geolocation.getCurrentPosition(position => {
       section.querySelector('#discovery-hint').textContent = 'Showing circles with a host-approved approximate area pin.';
       const radiusKm = section.querySelector('[name="radiusKm"]').value;
-      search(new URLSearchParams({ lat:String(position.coords.latitude), lon:String(position.coords.longitude), radiusKm }).toString());
+      search(new URLSearchParams({ lat:String(position.coords.latitude), lon:String(position.coords.longitude), radiusKm }).toString(), true);
     }, () => { section.querySelector('#discovery-hint').textContent = 'Location was not shared. You can still search by city or area.'; }, { enableHighAccuracy:false, timeout:10000, maximumAge:300000 });
   };
   search('');
@@ -197,11 +224,18 @@ function renderHostedDiscovery(){
 async function renderHostedProfile(){
   const mount = document.createElement('section');
   mount.className = 'card hosted-profile';
+  mount.id = 'account-section';
   content.querySelector('.hosted-layout').after(mount);
   try {
     const { profile } = await api('/account/profile');
-    mount.innerHTML = `<h2>Your private profile</h2><p class="small muted">Your details are shared with a circle's verified reviewers only after you apply and agree to share them. A new photo cancels open applications so you can review what is shared.</p><form class="form-grid"><label>About you<textarea name="bio" maxlength="500">${esc(profile.bio)}</textarea></label><label>Instagram<input name="instagram" maxlength="40" value="${esc(profile.socials.instagram)}"></label><label>Facebook<input name="facebook" maxlength="40" value="${esc(profile.socials.facebook)}"></label><label>Snapchat<input name="snapchat" maxlength="40" value="${esc(profile.socials.snapchat)}"></label><button class="primary" type="submit">Save introduction</button></form><div class="photo-control"><strong>Photo with your face</strong>${profile.hasPhoto ? '<img src="/api/account/photo" alt="Your private profile photo">' : '<p class="small muted">No photo added yet.</p>'}<label class="small">Choose a JPEG, PNG or WebP image, up to 2 MB<input type="file" accept="image/jpeg,image/png,image/webp"></label><button class="secondary" id="upload-photo" type="button">Save photo privately</button></div><p class="small muted">WhatsApp verification: ${profile.whatsappVerified ? 'verified' : 'waiting for a configured verification provider'}. Kitty does not label an unverified number as verified.</p>`;
-    mount.querySelector('form').onsubmit = event => { event.preventDefault(); run(async () => { const f = Object.fromEntries(new FormData(event.currentTarget)); await api('/account/profile', f); notice('Introduction saved'); }); };
+    const setup = [
+      ['Introduction', Boolean(profile.bio?.trim()), 'Write a little about yourself. Social handles are optional.'],
+      ['Private face photo', Boolean(profile.hasPhoto), 'Only a circle’s verified reviewers can see it after you apply.'],
+      ['WhatsApp verification', Boolean(profile.whatsappVerified), 'Waiting for Kitty’s verification provider.'],
+      ['Circle access', hostedMember?.identityStatus === 'verified' && hostedMember?.accessStatus === 'active', 'Opens after the required identity and access checks.'],
+    ];
+    mount.innerHTML = `<p class="eyebrow">Your space</p><h2>Build your private profile</h2><p class="small muted">Your details are shared with a circle's verified reviewers only after you apply and agree to share them. A new photo cancels open applications so you can review what is shared.</p><ol class="profile-checklist">${setup.map(([label,done,description]) => `<li class="${done ? 'complete' : ''}"><span aria-hidden="true">${done ? '✓' : '○'}</span><div><strong>${label}</strong><small>${description}</small></div></li>`).join('')}</ol><form class="form-grid"><label>About you<textarea name="bio" maxlength="500" placeholder="What do you enjoy doing together?">${esc(profile.bio)}</textarea></label><div class="social-grid"><label>Instagram<input name="instagram" maxlength="40" value="${esc(profile.socials.instagram)}" placeholder="Optional handle"></label><label>Facebook<input name="facebook" maxlength="40" value="${esc(profile.socials.facebook)}" placeholder="Optional handle"></label><label>Snapchat<input name="snapchat" maxlength="40" value="${esc(profile.socials.snapchat)}" placeholder="Optional handle"></label></div><button class="primary" type="submit">Save introduction</button></form><div class="photo-control"><strong>Photo with your face</strong>${profile.hasPhoto ? '<img src="/api/account/photo" alt="Your private profile photo">' : '<p class="small muted">No photo added yet.</p>'}<label class="small">Choose a JPEG, PNG or WebP image, up to 2 MB<input type="file" accept="image/jpeg,image/png,image/webp"></label><button class="secondary" id="upload-photo" type="button">Save photo privately</button></div><p class="small muted">WhatsApp verification: ${profile.whatsappVerified ? 'verified' : 'waiting for a configured verification provider'}. Kitty does not label an unverified number as verified.</p>`;
+    mount.querySelector('form').onsubmit = event => { event.preventDefault(); run(async () => { const f = Object.fromEntries(new FormData(event.currentTarget)); await api('/account/profile', f); notice('Introduction saved'); mount.remove(); await renderHostedProfile(); }); };
     mount.querySelector('#upload-photo').onclick = () => run(async () => {
       const file = mount.querySelector('input[type="file"]').files?.[0];
       if (!file || file.size > 2_097_152) throw new Error('Choose a photo up to 2 MB');
@@ -234,18 +268,28 @@ function hostedDialog(title, fields, save, refresh, action='Save') {
   modalForm.onsubmit = event => {
     event.preventDefault();
     run(async () => {
-      await save(Object.fromEntries(new FormData(modalForm)));
-      modal.close();
-      await refresh();
+      const submit = document.querySelector('#submit');
+      submit.disabled = true;
+      submit.textContent = 'Saving…';
+      try {
+        await save(Object.fromEntries(new FormData(modalForm)));
+        modal.close();
+        await refresh();
+      } finally {
+        submit.disabled = false;
+        submit.textContent = action;
+      }
     });
   };
   modal.showModal();
+  modalForm.querySelector('input:not([type="checkbox"]),textarea,select')?.focus();
 }
 
 async function renderHostedWorkspace(member) {
   content.querySelector('.hosted-workspace')?.remove();
   const mount = document.createElement('section');
   mount.className = 'hosted-workspace';
+  mount.id = 'your-circles';
   content.querySelector('.hosted-cards').before(mount);
   mount.innerHTML = '<p class="loading">Loading your circles…</p>';
   try {
@@ -284,13 +328,13 @@ async function renderHostedGroup(groupId, mount, member) {
     ]);
     const memberName = id => members.find(m => m.id === id)?.name || 'Member';
     const refresh = () => renderHostedGroup(groupId, mount, member);
-    mount.innerHTML = `<button class="text-btn" id="hosted-back">← All circles</button><div class="section-head"><div><p class="eyebrow">Your circle</p><h2>${esc(group.title)}</h2><p class="small muted">${esc([group.area,group.city].filter(Boolean).join(', '))} · ${members.length} / ${group.limit} members · Typical ${rupees(group.avgMonthlyCostPaise)} / month · Extras split among ${esc(group.expenseSplitBasis)}</p></div></div>
+    mount.innerHTML = `<button class="text-btn" id="hosted-back">← All circles</button><div class="section-head"><div><p class="eyebrow">Your circle</p><h2>${esc(group.title)}</h2><p class="small muted">${esc([group.area,group.city].filter(Boolean).join(', '))} · ${members.length} / ${group.limit} members · Typical ${rupees(group.avgMonthlyCostPaise)} / month · Extras split among ${esc(group.expenseSplitBasis)}</p></div></div><nav class="group-section-nav" aria-label="Circle sections"><a href="#circle-members">Members</a><a href="#circle-meetups">Meetups</a><a href="#circle-extras">Shared extras</a><a href="#circle-reviews">Reviews</a><a href="#circle-bishi">Bishi</a></nav>
       <div class="note">${esc(group.rules || 'No shared rules added yet.')} Private venue details appear only to members.</div>
       ${group.myRole==='host' && group.visibility==='discoverable' ? `<div class="public-area-control"><p class="small muted">Nearby discovery: ${group.nearbyDiscoverable ? 'on, using an approximate public area pin' : 'off'}. Your exact venue is never used.</p><div class="actions"><button class="secondary" id="set-public-pin">${group.nearbyDiscoverable ? 'Update approximate area' : 'Enable nearby discovery'}</button>${group.nearbyDiscoverable ? '<button class="text-btn" id="remove-public-pin">Remove nearby pin</button>' : ''}</div></div>` : ''}
-      <div class="section-head"><h2>Members</h2></div><div class="grid">${members.map(m => `<article class="card"><strong>${esc(m.name)}</strong><p class="small muted">${esc(m.role)}</p></article>`).join('')}</div>
-      <div class="section-head"><h2>Meetups</h2><button class="secondary" id="hosted-event">Plan meetup</button></div><div class="list">${events.map(e => `<div class="list-item"><div><strong>${esc(e.title)}</strong><small>${date(e.startsAt)} · ${esc(e.status)} · ${e.goingCount}/${e.capacity} going${e.location ? ` · ${esc(e.location)}` : ''}</small></div>${e.status==='scheduled' && new Date(e.startsAt) > new Date() ? `<div class="actions"><button class="text-btn" data-rsvp="${e.id}" data-response="going">Going</button><button class="text-btn" data-rsvp="${e.id}" data-response="maybe">Maybe</button><button class="text-btn" data-rsvp="${e.id}" data-response="not_going">Can't make it</button></div>` : ''}</div>`).join('') || empty('No meetups yet','Any active member can plan the next gathering.')}</div>
-      <div class="section-head"><h2>Shared extras</h2><button class="secondary" id="hosted-expense">Propose expense</button></div><p class="small muted">These are group records, not payments handled by Kitty. Every included member confirms their share before an expense is agreed.</p><div class="list">${expenses.map(e => { const mine=e.splits.find(s=>s.memberId===member.id); return `<div class="list-item"><div><strong>${esc(e.title)} · ${rupees(e.amountPaise)}</strong><small>${esc(e.status)} · Paid by ${esc(memberName(e.paidBy))} · ${e.splits.filter(s=>s.approved).length}/${e.splits.length} shares confirmed${mine ? ` · Your share ${rupees(mine.amountPaise)}` : ''}</small></div>${mine && ['proposed','agreed'].includes(e.status) ? `<div class="actions">${e.status==='proposed' && !mine.approved ? `<button class="primary" data-expense-approve="${e.id}">Confirm my share</button>` : ''}<button class="text-btn" data-expense-dispute="${e.id}">Question split</button></div>` : ''}</div>`; }).join('') || empty('Nothing to split yet','Add an extra cost when the group has agreed on a meetup or plan.')}</div>
-      <div class="section-head"><h2>Membership reviews</h2></div><div class="grid">${reviews ? (reviews.requests||[]).map(r => `<article class="card"><span class="pill">${esc(r.status)}</span><h3>${esc(r.profile.name)}</h3>${r.profile.photoUrl ? `<img class="review-photo" src="${esc(r.profile.photoUrl)}" alt="Applicant's shared profile photo">` : ''}<p>${esc(r.profile.bio || '')}</p><p class="small muted">Instagram: ${esc(r.profile.socials?.instagram || '—')} · Facebook: ${esc(r.profile.socials?.facebook || '—')} · Snapchat: ${esc(r.profile.socials?.snapchat || '—')} · WhatsApp: ${r.profile.whatsappVerified ? 'verified' : 'unverified'}</p><p class="small muted">${r.yesVotes}/${r.requiredVotes} yes votes needed · ${r.votes} votes cast</p>${r.mayVote ? `<div class="actions"><button class="primary" data-review-vote="${r.id}" data-approve="true">Welcome her</button><button class="secondary" data-review-vote="${r.id}" data-approve="false">Not this time</button></div>` : ''}</article>`).join('') || empty('No open reviews','Every eligible verified member can vote when someone applies.') : '<p class="note">Reviews are temporarily unavailable. Please try again shortly.</p>'}</div>
+      <div class="section-head" id="circle-members"><h2>Members</h2></div><div class="grid">${members.map(m => `<article class="card"><strong>${esc(m.name)}</strong><p class="small muted">${esc(m.role)}</p></article>`).join('')}</div>
+      <div class="section-head" id="circle-meetups"><h2>Meetups</h2><button class="secondary" id="hosted-event">Plan meetup</button></div><div class="list">${events.map(e => `<div class="list-item"><div><strong>${esc(e.title)}</strong><small>${date(e.startsAt)} · ${esc(e.status)} · ${e.goingCount}/${e.capacity} going${e.location ? ` · ${esc(e.location)}` : ''}</small></div>${e.status==='scheduled' && new Date(e.startsAt) > new Date() ? `<div class="actions"><button class="text-btn" data-rsvp="${e.id}" data-response="going">Going</button><button class="text-btn" data-rsvp="${e.id}" data-response="maybe">Maybe</button><button class="text-btn" data-rsvp="${e.id}" data-response="not_going">Can't make it</button></div>` : ''}</div>`).join('') || empty('No meetups yet','Any active member can plan the next gathering.')}</div>
+      <div class="section-head" id="circle-extras"><h2>Shared extras</h2><button class="secondary" id="hosted-expense">Propose expense</button></div><p class="small muted">These are group records, not payments handled by Kitty. Every included member confirms their share before an expense is agreed.</p><div class="list">${expenses.map(e => { const mine=e.splits.find(s=>s.memberId===member.id); return `<div class="list-item"><div><strong>${esc(e.title)} · ${rupees(e.amountPaise)}</strong><small>${esc(e.status)} · Paid by ${esc(memberName(e.paidBy))} · ${e.splits.filter(s=>s.approved).length}/${e.splits.length} shares confirmed${mine ? ` · Your share ${rupees(mine.amountPaise)}` : ''}</small></div>${mine && ['proposed','agreed'].includes(e.status) ? `<div class="actions">${e.status==='proposed' && !mine.approved ? `<button class="primary" data-expense-approve="${e.id}">Confirm my share</button>` : ''}<button class="text-btn" data-expense-dispute="${e.id}">Question split</button></div>` : ''}</div>`; }).join('') || empty('Nothing to split yet','Add an extra cost when the group has agreed on a meetup or plan.')}</div>
+      <div class="section-head" id="circle-reviews"><h2>Membership reviews</h2></div><div class="grid">${reviews ? (reviews.requests||[]).map(r => `<article class="card"><span class="pill">${esc(r.status)}</span><h3>${esc(r.profile.name)}</h3>${r.profile.photoUrl ? `<img class="review-photo" src="${esc(r.profile.photoUrl)}" alt="Applicant's shared profile photo">` : ''}<p>${esc(r.profile.bio || '')}</p><p class="small muted">Instagram: ${esc(r.profile.socials?.instagram || '—')} · Facebook: ${esc(r.profile.socials?.facebook || '—')} · Snapchat: ${esc(r.profile.socials?.snapchat || '—')} · WhatsApp: ${r.profile.whatsappVerified ? 'verified' : 'unverified'}</p><p class="small muted">${r.yesVotes}/${r.requiredVotes} yes votes needed · ${r.votes} votes cast</p>${r.mayVote ? `<div class="actions"><button class="primary" data-review-vote="${r.id}" data-approve="true">Welcome her</button><button class="secondary" data-review-vote="${r.id}" data-approve="false">Not this time</button></div>` : ''}</article>`).join('') || empty('No open reviews','Every eligible verified member can vote when someone applies.') : '<p class="note">Reviews are temporarily unavailable. Please try again shortly.</p>'}</div>
       ${group.myRole==='host' ? `<div class="section-head"><h2>Reconsider a rejection</h2></div><div class="list">${rejections ? (rejections.requests||[]).map(r => `<div class="list-item"><div><strong>${esc(r.name)}</strong><small>Cooldown through ${date(r.reapplyAfter)}</small></div><button class="text-btn" data-override="${r.id}">Review override</button></div>`).join('') || empty('No current rejections','An override requires a recorded reason and an available place.') : '<p class="note">Rejection records are temporarily unavailable.</p>'}</div>` : ''}`;
     mount.querySelector('#hosted-back').onclick = () => renderHostedWorkspace(member);
     mount.querySelector('#set-public-pin')?.addEventListener('click', () => {
@@ -320,6 +364,7 @@ async function renderHostedGroup(groupId, mount, member) {
 async function renderBishiGroup(groupId, mount, member, refresh){
   const panel = document.createElement('section');
   panel.className = 'bishi-panel';
+  panel.id = 'circle-bishi';
   mount.appendChild(panel);
   if (!hostedBishiEnabled) {
     panel.innerHTML = '<div class="section-head"><h2>Bishi pool records</h2></div><p class="note">Money pool plans and draws are closed until Kitty has the required legal clearance for this specific circle. Kitty will only keep records; members handle money outside Kitty.</p>';
