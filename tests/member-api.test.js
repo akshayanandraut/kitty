@@ -21,6 +21,7 @@ import { discoveryQuery, publicAreaPin } from '../lib/discovery.js';
 import { drawWinner, newDrawSeed, scheduledRound } from '../lib/bishi.js';
 import bishi from '../lib/member-routes/bishi.js';
 import locationUpdate from '../lib/member-routes/location-update.js';
+import leave from '../lib/member-routes/leave.js';
 import sharp from 'sharp';
 
 function response() {
@@ -34,7 +35,7 @@ test('production member routes reject anonymous reads and foreign-origin writes 
     assert.equal(res.statusCode, 401);
     assert.equal(res.body.error, 'sign_in_required');
   }
-  for (const handler of [profile, photo, create, apply, vote, override, eventCreate, eventRsvp, expensePropose, expenseDecision, joinCancel, locationUpdate, bishi]) {
+  for (const handler of [profile, photo, create, apply, vote, override, eventCreate, eventRsvp, expensePropose, expenseDecision, joinCancel, locationUpdate, leave, bishi]) {
     const res = response();
     await handler({ method: 'POST', headers: { origin: 'https://other.example' }, body: {} }, res);
     assert.equal(res.statusCode, 403);
@@ -100,4 +101,7 @@ test('combined Vercel member function dispatches only known routes', async () =>
   const profileResponse = response();
   await memberRoute({ method: 'GET', query: { route: 'profile' }, headers: {} }, profileResponse);
   assert.equal(profileResponse.statusCode, 401);
+  const leaveResponse = response();
+  await memberRoute({ method: 'POST', query: { route: 'leave' }, headers: { origin: 'https://other.example' }, body: {} }, leaveResponse);
+  assert.equal(leaveResponse.statusCode, 403);
 });

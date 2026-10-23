@@ -56,6 +56,8 @@
 .group-section-nav a{flex:0 0 auto;padding:9px 13px;border:1px solid #e8d4db;border-radius:100px;text-decoration:none;font-size:12px;font-weight:700;color:#80455a;background:#fff}
 .group-section-nav a:hover,.group-section-nav a:focus-visible{background:#f8ebef}
 .hosted-workspace [id^="circle-"]{scroll-margin-top:115px}
+.group-membership-actions{display:flex;justify-content:flex-end;margin:11px 0 4px}
+.group-membership-actions .text-btn{font-size:12px;color:#8a5263}
 @media(max-width:900px){.hosted-nav a{padding:8px;font-size:11px}.hosted .topbar{gap:8px}}
 @media(max-width:720px){.hosted .topbar{position:static}.hosted-nav a[href="#how-it-works"],.hosted-nav a[href="#your-circles"]{display:none}.hosted-nav a{font-size:11px;padding:8px 6px}.hosted .top-actions{margin-left:auto}.hosted-intro .lead{font-size:16px}.hero-actions{gap:9px}.hero-actions .text-btn{flex-basis:100%;justify-content:flex-start}.discovery-flower{font-size:44px}.profile-checklist,.social-grid{grid-template-columns:1fr}.discovery-form{padding:16px}}
 @media(prefers-reduced-motion:reduce){.hero-actions .primary,.hosted-cards .card{transition:none}.hero-actions .primary:hover,.hosted-cards .card:hover{transform:none}}
