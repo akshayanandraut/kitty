@@ -22,6 +22,7 @@ import { drawWinner, newDrawSeed, scheduledRound } from '../lib/bishi.js';
 import bishi from '../lib/member-routes/bishi.js';
 import locationUpdate from '../lib/member-routes/location-update.js';
 import leave from '../lib/member-routes/leave.js';
+import hostHandover from '../lib/member-routes/host-handover.js';
 import sharp from 'sharp';
 
 function response() {
@@ -29,13 +30,13 @@ function response() {
 }
 
 test('production member routes reject anonymous reads and foreign-origin writes before database access', async () => {
-  for (const handler of [profile, photo, review, home, group, rejections, bishi]) {
+  for (const handler of [profile, photo, review, home, group, rejections, hostHandover, bishi]) {
     const res = response();
     await handler({ method: 'GET', headers: {}, query: {} }, res);
     assert.equal(res.statusCode, 401);
     assert.equal(res.body.error, 'sign_in_required');
   }
-  for (const handler of [profile, photo, create, apply, vote, override, eventCreate, eventRsvp, expensePropose, expenseDecision, joinCancel, locationUpdate, leave, bishi]) {
+  for (const handler of [profile, photo, create, apply, vote, override, eventCreate, eventRsvp, expensePropose, expenseDecision, joinCancel, locationUpdate, leave, hostHandover, bishi]) {
     const res = response();
     await handler({ method: 'POST', headers: { origin: 'https://other.example' }, body: {} }, res);
     assert.equal(res.statusCode, 403);

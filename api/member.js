@@ -15,11 +15,12 @@ import joinCancel from '../lib/member-routes/join-cancel.js';
 import rejections from '../lib/member-routes/rejections.js';
 import locationUpdate from '../lib/member-routes/location-update.js';
 import leave from '../lib/member-routes/leave.js';
+import hostHandover from '../lib/member-routes/host-handover.js';
 import bishi from '../lib/member-routes/bishi.js';
 import { json } from '../lib/member-api.js';
 
 const routes = { profile, photo, home, group, create, apply, review, vote, override, rejections,
-  'location-update': locationUpdate, leave, bishi,
+  'location-update': locationUpdate, leave, 'host-handover': hostHandover, bishi,
   'event-create': eventCreate, 'event-rsvp': eventRsvp,
   'expense-propose': expensePropose, 'expense-decision': expenseDecision,
   'join-cancel': joinCancel };
