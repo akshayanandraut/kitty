@@ -150,7 +150,7 @@ function renderHosted(status){
     content.querySelector('.hosted-availability').after(gate);
     api('/auth/session').then(({ member }) => {
       if (!member) {
-        gate.innerHTML = '';
+        gate.remove();
         return;
       }
       hostedMember = member;
