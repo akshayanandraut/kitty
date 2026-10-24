@@ -111,9 +111,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method !== 'GET') throw new core.KittyError('route_not_found', 404);
     const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
-    if (!['index.html', 'app.js', 'cat.js', 'style.css', 'motion.css', 'discovery.css', 'ux.css', 'kitty-mark.svg'].includes(file)) throw new core.KittyError('route_not_found', 404);
+    if (!['index.html', 'app.js', 'cat.js', 'style.css', 'motion.css', 'discovery.css', 'ux.css', 'editorial.css', 'kitty-mark.svg', 'kitty-editorial.webp'].includes(file)) throw new core.KittyError('route_not_found', 404);
     const content = await readFile(join(root, 'public', file));
-    res.writeHead(200, { 'content-type': file.endsWith('.js') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.svg') ? 'image/svg+xml' : 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'", 'x-content-type-options': 'nosniff' });
+    res.writeHead(200, { 'content-type': file.endsWith('.js') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.svg') ? 'image/svg+xml' : file.endsWith('.webp') ? 'image/webp' : 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'", 'x-content-type-options': 'nosniff' });
     res.end(content);
   } catch (error) {
     json(res, error.status || 500, { error: error instanceof core.KittyError ? error.code : 'internal_error' });
