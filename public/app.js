@@ -6,6 +6,14 @@ const toast = document.querySelector('#toast');
 let users = [], current = null, me = null, page = 'home', selectedGroup = null, groupTab = 'members', hostedBishiEnabled = false, hostedSsoEnabled = false, hostedMember = null;
 
 const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const faithLabels = { any:'All faiths', hindu:'Hindu women', muslim:'Muslim women', christian:'Christian women', catholic:'Catholic women', sikh:'Sikh women', jain:'Jain women', buddhist:'Buddhist women', other:'Other faith community' };
+const communityLabels = { all:'Open to women', lesbian:'Lesbian women', lgbtq:'LGBTQ+ women' };
+const regionLabels = { any:'Across India', north_india:'North India', south_india:'South India', east_india:'East India', west_india:'West India', central_india:'Central India', northeast_india:'North East India', northwest_india:'North West India', southeast_india:'South East India', southwest_india:'South West India', punjabi:'Punjabi culture', assamese:'Assamese culture', other:'Other regional culture' };
+const styleLabels = { saree:'Saree & traditional', western:'Western wear', party:'Party looks', beach:'Beachwear', active:'Activewear', modest:'Modest style', hijab:'Hijab & modest wear', burkha:'Burkha & abaya', rida:'Rida', swimwear:'Bold swimwear', sweet:'Soft & sweet', glam:'Pretty & glam', bold:'Bold looks', casual:'Casual days' };
+const options = (labels, chosen) => Object.entries(labels).map(([value,label]) => `<option value="${value}" ${value === chosen ? 'selected' : ''}>${esc(label)}</option>`).join('');
+const groupTags = group => [audienceText(group), group.regionFocus && group.regionFocus !== 'any' ? regionLabels[group.regionFocus] : '', ...(group.styleTags || []).map(tag => styleLabels[tag]).filter(Boolean)].filter(Boolean).join(' · ');
+const audienceText = group => [group.faithFocus !== 'any' ? faithLabels[group.faithFocus] : '', group.communitySpace !== 'all' ? communityLabels[group.communitySpace] : ''].filter(Boolean).join(' · ');
+const audienceConsent = group => audienceText(group) ? `<label class="check"><input type="checkbox" name="confirmAudience" required> I identify with this circle's community (${esc(audienceText(group))}) and choose to apply.</label>` : '';
 const rupees = paise => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format((paise || 0)/100);
 const date = iso => new Date(iso).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});
 const pill = (text, tone = '') => `<span class="pill ${tone}">${esc(text)}</span>`;
@@ -137,11 +145,12 @@ function renderHosted(status){
   hostedBishiEnabled = status.bishi === true;
   hostedSsoEnabled = status.sso === true;
   hostedMember = null;
+  document.body.classList.remove('hosted-signed-in');
   document.body.classList.add('hosted');
   document.querySelector('.top-actions').innerHTML = '<nav class="hosted-nav" aria-label="Page sections"><a href="#discover">Find circles</a><a href="#how-it-works">How Kitty works</a></nav>';
   const signIn = status.sso ? '<a class="text-btn hero-sign-in" href="/auth/start">Sign in with Grasany <span aria-hidden="true">↗</span></a>' : '';
   const previewMessage = status.sso
-    ? 'Explore public circles now. Sign in to start your profile. Joining opens after verification and access checks.'
+    ? 'Explore public circles now. Sign in to start your profile. Applying requires current Grasany KYC and Kitty access.'
     : 'Explore public circles now. Sign-in and group access are coming soon.';
   content.innerHTML=`<div class="hosted-layout"><section class="hosted-intro"><p class="eyebrow">A little dressed up. Entirely yourself.</p><h1>Find your <em>kind of company.</em></h1><p class="lead">Kitty is where women find a circle nearby, plan their next get-together, and make room for real friendship.</p><div class="hero-actions"><a class="primary" href="#discover">Find a circle <span aria-hidden="true">↗</span></a>${signIn}</div><div class="hosted-availability" role="status"><span class="availability-dot" aria-hidden="true"></span><span>${previewMessage}</span></div></section><div class="hosted-art"><img src="/kitty-editorial.webp" alt="" width="900" height="1200"><div class="hosted-art-caption">Good company looks good on you. <span aria-hidden="true">✦</span></div></div></div><div class="hosted-cards" id="how-it-works"><article class="card"><span class="eyebrow">01 / Find</span><h3>Find your people.</h3><p>Look for a circle in your area. Hosts share a broad location, never a private venue.</p></article><article class="card"><span class="eyebrow">02 / Meet</span><h3>Get together.</h3><p>Apply when a circle feels right. Share your profile with its reviewers only when you choose.</p></article><article class="card"><span class="eyebrow">03 / Enjoy</span><h3>Keep things easy.</h3><p>Plan dates and hosting turns together. Track shared extras without Kitty holding group money.</p></article></div><div class="hosted-foot"><strong>Planned access: ${rupees(status.price.amountPaise)} once for lifetime access.</strong><span>Checkout is currently closed. No recurring mandate.</span></div><p class="small muted">Bishi pool tracking and draws remain closed pending group-specific legal authorization. Kitty does not collect or transfer pooled funds.</p>`;
   if (status.sso) {
@@ -154,14 +163,17 @@ function renderHosted(status){
         return;
       }
       hostedMember = member;
+      document.body.classList.add('hosted-signed-in');
+      content.querySelector('.hosted-layout').before(gate);
       content.querySelector('.hero-sign-in')?.remove();
       const needsAttestation = !member.adultAttested || !member.womenOnlyAttested;
+      const accessReady = member.identityStatus === 'verified' && member.accessStatus === 'active';
       if (!needsAttestation) document.querySelector('.hosted-nav').insertAdjacentHTML('beforeend', '<a href="#account-section">Your profile</a>');
-      if (!needsAttestation && member.identityStatus === 'verified' && member.accessStatus === 'active') document.querySelector('.hosted-nav').insertAdjacentHTML('beforeend', '<a href="#your-circles">Your circles</a>');
-      gate.innerHTML = `<strong>Welcome, ${esc(member.name)}.</strong><p>Your account is signed in. Circle access opens after Kitty's profile, verification and access requirements are met.</p>${needsAttestation ? '<label class="check"><input type="checkbox" id="attest-adult"> I confirm I am at least 18 years old.</label><label class="check"><input type="checkbox" id="attest-woman"> I self-attest that I am eligible for this women-only community.</label><button class="primary" id="save-attestation">Save my statements</button>' : `<p class="small muted">Identity: ${esc(member.identityStatus)} · Access: ${esc(member.accessStatus)}</p>`}<button class="text-btn" id="sign-out">Sign out</button>`;
+      if (!needsAttestation && accessReady) document.querySelector('.hosted-nav').insertAdjacentHTML('beforeend', '<a href="#your-circles">Your circles</a>');
+      gate.innerHTML = `<p class="eyebrow">Your Kitty space</p><h1>Welcome${member.name ? `, ${esc(member.name)}` : ''}.</h1><p>${needsAttestation ? 'Before you start, please confirm these statements about yourself.' : accessReady ? 'Your circles are ready below.' : 'Build your profile now. Applications open after current Grasany KYC and Kitty access checks.'}</p>${needsAttestation ? '<label class="check"><input type="checkbox" id="attest-adult"> I confirm I am at least 18 years old.</label><label class="check"><input type="checkbox" id="attest-woman"> I self-attest that I am eligible for this women-only community.</label><button class="primary" id="save-attestation">Save my statements</button>' : ''}<button class="text-btn" id="sign-out">Sign out</button>`;
       if (!needsAttestation) {
         renderHostedProfile();
-        if (member.identityStatus === 'verified' && member.accessStatus === 'active') renderHostedWorkspace(member);
+        if (accessReady) renderHostedWorkspace(member);
       }
       document.querySelector('#save-attestation')?.addEventListener('click', () => run(async () => {
         if (!document.querySelector('#attest-adult').checked || !document.querySelector('#attest-woman').checked) throw new Error('Both statements are required');
@@ -173,12 +185,21 @@ function renderHosted(status){
     }).catch(() => { gate.textContent = 'Sign-in is temporarily unavailable.'; });
   }
   renderHostedDiscovery();
+  const lookbook = document.createElement('section');
+  lookbook.className = 'kitty-lookbook';
+  lookbook.setAttribute('aria-labelledby', 'kitty-lookbook-title');
+  lookbook.innerHTML = '<div class="lookbook-copy"><p class="eyebrow">For every kind of Kitty night</p><h2 id="kitty-lookbook-title">Show up as you.</h2><p>Saree, sneakers, a party dress or a beach hat. The best circle makes room for your whole personality.</p></div><img src="/kitty-looks.webp" alt="Fashion illustration of six adult women in traditional, tailored, party, beach, active and modest looks" width="1600" height="542" loading="lazy">';
+  content.querySelector('.hosted-public').after(lookbook);
 }
 function renderHostedDiscovery(){
   const section = document.createElement('section');
   section.className = 'hosted-public';
   section.id = 'discover';
   section.innerHTML = `<div class="section-head discovery-heading"><div><p class="eyebrow">The next good night starts here</p><h2>Find a circle near you.</h2><p class="lead">Search a city or area. Use “Near me” only if you want to share your location for this search. Private venues and member locations never appear in public results.</p></div></div><form class="discovery-form" role="search"><label>City, area or circle<input name="search" maxlength="80" placeholder="Try Mumbai or Bandra" autocomplete="off"></label><label>Within<select name="radiusKm"><option value="10">10 km</option><option value="25" selected>25 km</option><option value="50">50 km</option><option value="100">100 km</option></select></label><div class="actions"><button class="primary" type="submit">Search</button><button class="secondary" type="button" id="nearby-circles">Near me</button></div></form><div class="discovery-meta"><p class="small muted" id="discovery-hint">Only broad areas that hosts choose to share appear here.</p><p class="small" id="discovery-summary" role="status"></p></div><div class="grid" id="discovery-results" aria-live="polite"><p class="loading">Finding circles…</p></div>`;
+  const more = document.createElement('details');
+  more.className = 'discovery-more';
+  more.innerHTML = `<summary>More filters: community, region & style</summary><div class="discovery-filter-grid"><label>Faith community<select name="faithFocus">${options(faithLabels,'any')}</select></label><label>Community space<select name="communitySpace">${options(communityLabels,'all')}</select></label><label>Regional culture<select name="regionFocus">${options(regionLabels,'any')}</select></label><label>Style mood<select name="styleTag">${options({any:'Any style',...styleLabels},'any')}</select></label></div><p>These filters describe circles, not your personal profile.</p>`;
+  section.querySelector('.discovery-form').appendChild(more);
   content.querySelector('.hosted-cards').before(section);
   const results = section.querySelector('#discovery-results');
   const summary = section.querySelector('#discovery-summary');
@@ -186,7 +207,16 @@ function renderHostedDiscovery(){
   const renderResults = ({ groups = [], sessions = [] }, nearby = false) => {
     const count = groups.length + (nearby ? 0 : sessions.length);
     summary.textContent = count ? `${count} ${count === 1 ? 'result' : 'results'} found` : 'No public results yet';
-    results.innerHTML = `${!nearby ? sessions.map(s => `<article class="card discovery-card"><span class="pill">Open meetup</span><h3>${esc(s.title)}</h3><p>${esc(s.theme)}</p><p class="meta">${date(s.startsAt)} · ${esc(s.city)} · ${esc(s.available)} places</p></article>`).join('') : ''}${groups.map(g => `<article class="card discovery-card"><span class="pill">Discoverable circle</span><h3>${esc(g.title)}</h3><p>${esc(g.description)}</p><p class="meta">${esc([g.area,g.city].filter(Boolean).join(', '))}${g.distanceKm !== null ? ` · About ${esc(g.distanceKm)} km away` : ''} · ${esc(g.available)} places · Typical ${rupees(g.avgMonthlyCostPaise)} / month</p>${hostedSsoEnabled ? `<button class="text-btn" data-discovery-apply="${esc(g.id)}">Request to join →</button>` : '<span class="small muted">Applications open after sign-in is ready.</span>'}</article>`).join('')}` || empty('No circles found','Try another area or a wider distance. New circles appear when hosts choose to share them publicly.');
+    results.innerHTML = `${!nearby ? sessions.map(s => `<article class="card discovery-card"><span class="pill">Open meetup</span><h3>${esc(s.title)}</h3><p>${esc(s.theme)}</p><p class="meta">${date(s.startsAt)} · ${esc(s.city)} · ${esc(s.available)} places</p></article>`).join('') : ''}${groups.map(g => `<article class="card discovery-card"><span class="pill">Discoverable circle</span><h3>${esc(g.title)}</h3><p>${esc(g.description)}</p><p class="meta">${esc([g.area,g.city].filter(Boolean).join(', '))}${g.distanceKm != null ? ` · About ${esc(g.distanceKm)} km away` : ''} · ${esc(g.available)} places · Typical ${rupees(g.avgMonthlyCostPaise)} / month</p>${hostedSsoEnabled ? `<button class="text-btn" data-discovery-apply="${esc(g.id)}">Request to join →</button>` : '<span class="small muted">Applications open after sign-in is ready.</span>'}</article>`).join('')}` || empty('No circles found','Try another area or a wider distance. New circles appear when hosts choose to share them publicly.');
+    const groupCards = [...results.querySelectorAll('.discovery-card')].slice(nearby ? 0 : sessions.length);
+    groups.forEach((g, index) => {
+      const labels = [groupTags(g)].filter(Boolean);
+      if (!labels.length) return;
+      const detail = document.createElement('p');
+      detail.className = 'discovery-tags';
+      detail.textContent = labels.join(' · ');
+      groupCards[index]?.querySelector('h3')?.after(detail);
+    });
     results.querySelectorAll('[data-discovery-apply]').forEach(button => button.onclick = () => {
       if (!hostedMember) return window.location.assign('/auth/start');
       if (hostedMember.identityStatus !== 'verified' || hostedMember.accessStatus !== 'active') {
@@ -194,7 +224,7 @@ function renderHostedDiscovery(){
         return notice('Complete your profile and access checks before applying', true);
       }
       const group = groups.find(g=>g.id===button.dataset.discoveryApply);
-      hostedDialog(`Apply to ${group?.title || 'circle'}`, `<p class="small">Typical monthly cost: ${rupees(group?.avgMonthlyCostPaise)}.</p><label class="check"><input type="checkbox" name="shareProfile" required> Share my current profile and private photo with this circle's verified reviewers for this application.</label>`, async f=>{await api('/member?route=apply',{groupId:group.id,shareProfile:f.shareProfile==='on'});notice('Application shared for a member vote')}, async()=>{if(hostedMember.identityStatus==='verified' && hostedMember.accessStatus==='active')await renderHostedWorkspace(hostedMember)}, 'Apply');
+      hostedDialog(`Apply to ${group?.title || 'circle'}`, `<p class="small">Typical monthly cost: ${rupees(group?.avgMonthlyCostPaise)}.</p>${audienceConsent(group)}<label class="check"><input type="checkbox" name="shareProfile" required> Share my current profile and private photo with this circle's verified reviewers for this application.</label>`, async f=>{await api('/member?route=apply',{groupId:group.id,shareProfile:f.shareProfile==='on',confirmAudience:f.confirmAudience==='on'});notice('Application shared for a member vote')}, async()=>{if(hostedMember.identityStatus==='verified' && hostedMember.accessStatus==='active')await renderHostedWorkspace(hostedMember)}, 'Apply');
     });
   };
   const search = async (query, nearby = false) => {
@@ -208,14 +238,15 @@ function renderHostedDiscovery(){
       if (request === searchSequence) { summary.textContent = ''; results.innerHTML = '<p class="note">Circle search is temporarily unavailable. Please try again.</p>'; }
     }
   };
-  section.querySelector('form').onsubmit = event => { event.preventDefault(); const term = section.querySelector('[name="search"]').value.trim(); search(new URLSearchParams({ search:term }).toString()); };
+  const selectedFilters = () => { const form = section.querySelector('form'); return { search:form.elements.namedItem('search').value.trim(), faithFocus:form.elements.faithFocus.value, communitySpace:form.elements.communitySpace.value, regionFocus:form.elements.regionFocus.value, styleTag:form.elements.styleTag.value }; };
+  section.querySelector('form').onsubmit = event => { event.preventDefault(); search(new URLSearchParams(selectedFilters()).toString()); };
   section.querySelector('#nearby-circles').onclick = () => {
     if (!navigator.geolocation) return notice('Location is unavailable on this device', true);
     section.querySelector('#discovery-hint').textContent = 'Requesting your location for this search only…';
     navigator.geolocation.getCurrentPosition(position => {
       section.querySelector('#discovery-hint').textContent = 'Showing circles with a host-approved approximate area pin.';
       const radiusKm = section.querySelector('[name="radiusKm"]').value;
-      search(new URLSearchParams({ lat:String(position.coords.latitude), lon:String(position.coords.longitude), radiusKm }).toString(), true);
+      search(new URLSearchParams({ ...selectedFilters(), lat:String(position.coords.latitude), lon:String(position.coords.longitude), radiusKm }).toString(), true);
     }, () => { section.querySelector('#discovery-hint').textContent = 'Location was not shared. You can still search by city or area.'; }, { enableHighAccuracy:false, timeout:10000, maximumAge:300000 });
   };
   search('');
@@ -231,9 +262,9 @@ async function renderHostedProfile(){
       ['Introduction', Boolean(profile.bio?.trim()), 'Write a little about yourself. Social handles are optional.'],
       ['Private face photo', Boolean(profile.hasPhoto), 'Only a circle’s verified reviewers can see it after you apply.'],
       ['WhatsApp verification', Boolean(profile.whatsappVerified), 'Waiting for Kitty’s verification provider.'],
-      ['Circle access', hostedMember?.identityStatus === 'verified' && hostedMember?.accessStatus === 'active', 'Opens after the required identity and access checks.'],
+      ['Grasany KYC & Kitty access', hostedMember?.identityStatus === 'verified' && hostedMember?.accessStatus === 'active', 'A current account KYC decision and product access are required to apply.'],
     ];
-    mount.innerHTML = `<p class="eyebrow">Your space</p><h2>Build your private profile</h2><p class="small muted">Your details are shared with a circle's verified reviewers only after you apply and agree to share them. A new photo cancels open applications so you can review what is shared.</p><ol class="profile-checklist">${setup.map(([label,done,description]) => `<li class="${done ? 'complete' : ''}"><span aria-hidden="true">${done ? '✓' : '○'}</span><div><strong>${label}</strong><small>${description}</small></div></li>`).join('')}</ol><form class="form-grid"><label>About you<textarea name="bio" maxlength="500" placeholder="What do you enjoy doing together?">${esc(profile.bio)}</textarea></label><div class="social-grid"><label>Instagram<input name="instagram" maxlength="40" value="${esc(profile.socials.instagram)}" placeholder="Optional handle"></label><label>Facebook<input name="facebook" maxlength="40" value="${esc(profile.socials.facebook)}" placeholder="Optional handle"></label><label>Snapchat<input name="snapchat" maxlength="40" value="${esc(profile.socials.snapchat)}" placeholder="Optional handle"></label></div><button class="primary" type="submit">Save introduction</button></form><div class="photo-control"><strong>Photo with your face</strong>${profile.hasPhoto ? '<img src="/api/account/photo" alt="Your private profile photo">' : '<p class="small muted">No photo added yet.</p>'}<label class="small">Choose a JPEG, PNG or WebP image, up to 2 MB<input type="file" accept="image/jpeg,image/png,image/webp"></label><button class="secondary" id="upload-photo" type="button">Save photo privately</button></div><p class="small muted">WhatsApp verification: ${profile.whatsappVerified ? 'verified' : 'waiting for a configured verification provider'}. Kitty does not label an unverified number as verified.</p>`;
+    mount.innerHTML = `<p class="eyebrow">Your space</p><h2>Build your private profile</h2><p class="small muted">Your details are shared with a circle's verified reviewers only after you apply and agree to share them. A new photo cancels open applications so you can review what is shared.</p><ol class="profile-checklist">${setup.map(([label,done,description]) => `<li class="${done ? 'complete' : ''}"><span aria-hidden="true">${done ? '✓' : '○'}</span><div><strong>${label}</strong><small>${description}</small></div></li>`).join('')}</ol><form class="form-grid"><label>About you<textarea name="bio" maxlength="500" placeholder="What do you enjoy doing together?">${esc(profile.bio)}</textarea></label><div class="social-grid"><label>Instagram<input name="instagram" maxlength="40" value="${esc(profile.socials?.instagram)}" placeholder="Optional handle"></label><label>Facebook<input name="facebook" maxlength="40" value="${esc(profile.socials?.facebook)}" placeholder="Optional handle"></label><label>Snapchat<input name="snapchat" maxlength="40" value="${esc(profile.socials?.snapchat)}" placeholder="Optional handle"></label></div><button class="primary" type="submit">Save introduction</button></form><div class="photo-control"><strong>Photo with your face</strong>${profile.hasPhoto ? '<img src="/api/account/photo" alt="Your private profile photo">' : '<p class="small muted">No photo added yet.</p>'}<label class="small">Choose a JPEG, PNG or WebP image, up to 2 MB<input type="file" accept="image/jpeg,image/png,image/webp"></label><button class="secondary" id="upload-photo" type="button">Save photo privately</button></div><p class="small muted">WhatsApp verification: ${profile.whatsappVerified ? 'verified' : 'waiting for a configured verification provider'}. Kitty does not label an unverified number as verified.</p>`;
     mount.querySelector('form').onsubmit = event => { event.preventDefault(); run(async () => { const f = Object.fromEntries(new FormData(event.currentTarget)); await api('/account/profile', f); notice('Introduction saved'); mount.remove(); await renderHostedProfile(); }); };
     mount.querySelector('#upload-photo').onclick = () => run(async () => {
       const file = mount.querySelector('input[type="file"]').files?.[0];
@@ -271,7 +302,10 @@ function hostedDialog(title, fields, save, refresh, action='Save') {
       submit.disabled = true;
       submit.textContent = 'Saving…';
       try {
-        await save(Object.fromEntries(new FormData(modalForm)));
+        const formData = new FormData(modalForm);
+        const values = Object.fromEntries(formData);
+        if (modalForm.querySelector('[name="styleTags"]')) values.styleTags = formData.getAll('styleTags');
+        await save(values);
         modal.close();
         await refresh();
       } finally {
@@ -300,18 +334,18 @@ async function renderHostedWorkspace(member) {
       <p class="small muted">Your photo and social details remain private until you apply to a circle and agree to share a snapshot with its verified reviewers.</p>
       <div class="grid">${myGroups.map(g => `<article class="card"><span class="pill">${esc(g.role)}</span><h3>${esc(g.title)}</h3><p>${esc(g.city)} · Typical ${rupees(g.avgMonthlyCostPaise)} / month</p><button class="text-btn" data-open-group="${g.id}">Open circle →</button></article>`).join('') || empty('No circles yet','You can start one or explore a discoverable circle.')}</div>
       <div class="section-head"><h2>Your applications</h2></div><div class="list">${applications.map(a => `<div class="list-item"><div><strong>${esc(a.groupTitle)}</strong><small>${esc(a.status)}${a.reapplyAfter ? ` · May reapply after ${date(a.reapplyAfter)}` : ''}</small></div>${['requested','waitlisted'].includes(a.status) ? `<button class="text-btn" data-withdraw="${a.id}">Withdraw</button>` : ''}</div>`).join('') || empty('No applications','Apply to any circle that feels right for you.')}</div>
-      <div class="section-head"><h2>Discoverable circles</h2></div>${!home.profileReady ? '<div class="note">To apply, add a private face photo and complete WhatsApp verification. Applications remain closed until verification is configured.</div>' : ''}<div class="grid">${discoverable.map(g => `<article class="card"><span class="pill">${esc(g.city)}</span><h3>${esc(g.title)}</h3><p>${esc(g.description)}</p><p class="meta">${g.members} / ${g.limit} members · Typical ${rupees(g.avgMonthlyCostPaise)} / month · Extras: ${esc(g.expenseSplitBasis)}</p><button class="text-btn" data-apply-group="${g.id}" ${home.profileReady ? '' : 'disabled'}>Apply to join →</button></article>`).join('') || empty('No public circles yet','New circles will appear here when their hosts choose discoverability.')}</div>`;
+      <div class="section-head"><h2>Discoverable circles</h2></div>${!home.profileReady ? '<div class="note">To apply, add a private face photo and complete WhatsApp verification. Applications remain closed until verification is configured.</div>' : ''}<div class="grid">${discoverable.map(g => `<article class="card"><span class="pill">${esc(g.city)}</span><h3>${esc(g.title)}</h3><p>${esc(g.description)}</p><p class="discovery-tags">${esc([audienceText(g),...(g.styleTags||[]).map(tag=>styleLabels[tag]).filter(Boolean)].filter(Boolean).join(' · '))}</p><p class="meta">${g.members} / ${g.limit} members · Typical ${rupees(g.avgMonthlyCostPaise)} / month · Extras: ${esc(g.expenseSplitBasis)}</p><button class="text-btn" data-apply-group="${g.id}" ${home.profileReady ? '' : 'disabled'}>Apply to join →</button></article>`).join('') || empty('No public circles yet','New circles will appear here when their hosts choose discoverability.')}</div>`;
     mount.querySelector('#hosted-create').onclick = () => hostedDialog('Start a circle',
-      `${field('Circle name','title','text','maxlength="80"')}${textArea('About this circle','description','maxlength="500"')}${field('City','city','text','maxlength="80"')}<label>Public area (optional)<input name="area" maxlength="80" placeholder="Bandra West"></label><label>Member limit<input name="limit" type="number" min="2" max="100" value="8" required></label><label>Typical monthly cost in rupees<input name="monthlyCost" type="number" min="0" step="0.01" value="0" required></label><label>Extras split among<select name="expenseSplitBasis"><option value="members">Active members</option><option value="attendees">Meetup attendees who RSVP going</option></select></label><label>Visibility<select name="visibility"><option value="discoverable">Discoverable</option><option value="private">Private</option></select></label><label>Shared rules<textarea name="rules" maxlength="2000"></textarea></label>`,
-      async f => { await api('/member?route=create', { title:f.title, description:f.description, city:f.city, area:f.area, limit:Number(f.limit), avgMonthlyCostPaise:Math.round(Number(f.monthlyCost)*100), expenseSplitBasis:f.expenseSplitBasis, visibility:f.visibility, rules:f.rules }); notice('Circle created'); },
+      `${field('Circle name (no religion in the name)','title','text','maxlength="80"')}${textArea('About this circle','description','maxlength="500"')}${field('City','city','text','maxlength="80"')}<label>Public area (optional)<input name="area" maxlength="80" placeholder="Bandra West"></label><label>Member limit<input name="limit" type="number" min="2" max="100" value="8" required></label><label>Typical monthly cost in rupees<input name="monthlyCost" type="number" min="0" step="0.01" value="0" required></label><label>Extras split among<select name="expenseSplitBasis"><option value="members">Active members</option><option value="attendees">Meetup attendees who RSVP going</option></select></label><label>Visibility<select name="visibility"><option value="discoverable">Discoverable</option><option value="private">Private</option></select></label><label>Faith community<select name="faithFocus">${options(faithLabels,'any')}</select></label><label>Community space<select name="communitySpace">${options(communityLabels,'all')}</select></label><label>Regional culture<select name="regionFocus">${options(regionLabels,'any')}</select></label><fieldset class="style-choices"><legend>Style mood (choose up to 3)</legend>${Object.entries(styleLabels).map(([value,label]) => `<label class="check"><input type="checkbox" name="styleTags" value="${value}"> ${esc(label)}</label>`).join('')}</fieldset><p class="small muted">Audience settings are self identified. KYC confirms identity; it does not prove faith, culture or orientation.</p><label>Shared rules<textarea name="rules" maxlength="2000"></textarea></label>`,
+      async f => { const styleTags = f.styleTags || []; if (styleTags.length > 3) throw new Error('Choose up to 3 style moods'); await api('/member?route=create', { title:f.title, description:f.description, city:f.city, area:f.area, limit:Number(f.limit), avgMonthlyCostPaise:Math.round(Number(f.monthlyCost)*100), expenseSplitBasis:f.expenseSplitBasis, visibility:f.visibility, faithFocus:f.faithFocus, communitySpace:f.communitySpace, regionFocus:f.regionFocus, styleTags, rules:f.rules }); notice('Circle created'); },
       () => renderHostedWorkspace(member), 'Create circle');
     mount.querySelectorAll('[data-open-group]').forEach(button => button.onclick = () => renderHostedGroup(button.dataset.openGroup, mount, member));
     mount.querySelectorAll('[data-withdraw]').forEach(button => button.onclick = () => run(async () => { await api('/member?route=join-cancel', { requestId:button.dataset.withdraw }); notice('Application withdrawn'); await renderHostedWorkspace(member); }));
     mount.querySelectorAll('[data-apply-group]').forEach(button => button.onclick = () => {
       const group = discoverable.find(g => g.id === button.dataset.applyGroup);
       hostedDialog(`Apply to ${group?.title || 'circle'}`,
-        `<p class="small">Typical monthly cost: ${rupees(group?.avgMonthlyCostPaise)}. Extras are split among ${esc(group?.expenseSplitBasis)}.</p><label class="check"><input type="checkbox" name="shareProfile" required> Share my current profile and private photo with this circle's verified reviewers for this application.</label>`,
-        async f => { await api('/member?route=apply', { groupId:button.dataset.applyGroup, shareProfile:f.shareProfile==='on' }); notice('Application shared for a member vote'); },
+        `<p class="small">Typical monthly cost: ${rupees(group?.avgMonthlyCostPaise)}. Extras are split among ${esc(group?.expenseSplitBasis)}.</p>${audienceConsent(group)}<label class="check"><input type="checkbox" name="shareProfile" required> Share my current profile and private photo with this circle's verified reviewers for this application.</label>`,
+        async f => { await api('/member?route=apply', { groupId:button.dataset.applyGroup, shareProfile:f.shareProfile==='on', confirmAudience:f.confirmAudience==='on' }); notice('Application shared for a member vote'); },
         () => renderHostedWorkspace(member), 'Apply');
     });
   } catch { mount.innerHTML = '<p class="note">Your circles are temporarily unavailable.</p>'; }
@@ -329,7 +363,7 @@ async function renderHostedGroup(groupId, mount, member) {
     const memberName = id => members.find(m => m.id === id)?.name || 'Member';
     const canLeave = group.myRole !== 'host' || members.filter(m => m.role === 'host').length > 1;
     const refresh = () => renderHostedGroup(groupId, mount, member);
-    mount.innerHTML = `<button class="text-btn" id="hosted-back">← All circles</button><div class="section-head"><div><p class="eyebrow">Your circle</p><h2>${esc(group.title)}</h2><p class="small muted">${esc([group.area,group.city].filter(Boolean).join(', '))} · ${members.length} / ${group.limit} members · Typical ${rupees(group.avgMonthlyCostPaise)} / month · Extras split among ${esc(group.expenseSplitBasis)}</p></div></div><nav class="group-section-nav" aria-label="Circle sections"><a href="#circle-members">Members</a><a href="#circle-meetups">Meetups</a><a href="#circle-extras">Shared extras</a><a href="#circle-reviews">Reviews</a><a href="#circle-bishi">Bishi</a></nav>
+    mount.innerHTML = `<button class="text-btn" id="hosted-back">← All circles</button><div class="section-head"><div><p class="eyebrow">Your circle</p><h2>${esc(group.title)}</h2><p class="small muted">${esc([group.area,group.city].filter(Boolean).join(', '))} · ${members.length} / ${group.limit} members · Typical ${rupees(group.avgMonthlyCostPaise)} / month · Extras split among ${esc(group.expenseSplitBasis)}</p><p class="discovery-tags">${esc([audienceText(group),...(group.styleTags||[]).map(tag=>styleLabels[tag]).filter(Boolean)].filter(Boolean).join(' · '))}</p></div></div><nav class="group-section-nav" aria-label="Circle sections"><a href="#circle-members">Members</a><a href="#circle-meetups">Meetups</a><a href="#circle-extras">Shared extras</a><a href="#circle-reviews">Reviews</a><a href="#circle-bishi">Bishi</a></nav>
       <div class="note">${esc(group.rules || 'No shared rules added yet.')} Private venue details appear only to members.</div>
       <div class="group-membership-actions">${canLeave ? '<button class="text-btn" id="leave-circle">Leave this circle</button>' : '<span class="small muted">To leave as the sole host, arrange a host handover first.</span>'}</div>
       ${group.myRole==='host' && group.visibility==='discoverable' ? `<div class="public-area-control"><p class="small muted">Nearby discovery: ${group.nearbyDiscoverable ? 'on, using an approximate public area pin' : 'off'}. Your exact venue is never used.</p><div class="actions"><button class="secondary" id="set-public-pin">${group.nearbyDiscoverable ? 'Update approximate area' : 'Enable nearby discovery'}</button>${group.nearbyDiscoverable ? '<button class="text-btn" id="remove-public-pin">Remove nearby pin</button>' : ''}</div></div>` : ''}

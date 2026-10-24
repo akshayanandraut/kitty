@@ -48,8 +48,10 @@ test('production member routes reject anonymous reads and foreign-origin writes 
 });
 
 test('location search validates coordinates and stores an approximate area pin', () => {
-  assert.deepEqual(discoveryQuery({ search:'  Bandra   West  ' }), { search:'Bandra West', nearby:null });
-  assert.deepEqual(discoveryQuery({ lat:'19.12', lon:'72.88', radiusKm:'25' }), { search:'', nearby:{lat:19.12,lon:72.88,radiusKm:25} });
+  assert.deepEqual(discoveryQuery({ search:'  Bandra   West  ' }), { search:'Bandra West', faithFocus:'any', communitySpace:'all', regionFocus:'any', styleTag:'any', nearby:null });
+  assert.deepEqual(discoveryQuery({ lat:'19.12', lon:'72.88', radiusKm:'25' }), { search:'', faithFocus:'any', communitySpace:'all', regionFocus:'any', styleTag:'any', nearby:{lat:19.12,lon:72.88,radiusKm:25} });
+  assert.deepEqual(discoveryQuery({ faithFocus:'muslim', communitySpace:'lesbian', regionFocus:'assamese', styleTag:'hijab' }), { search:'', faithFocus:'muslim', communitySpace:'lesbian', regionFocus:'assamese', styleTag:'hijab', nearby:null });
+  assert.throws(() => discoveryQuery({ faithFocus:'invalid' }), /invalid_filter/);
   assert.deepEqual(publicAreaPin(19.12345,72.87654), { latitude:19.12, longitude:72.88 });
   assert.throws(() => discoveryQuery({ lat:'91',lon:'72' }), /invalid_location/);
   assert.throws(() => discoveryQuery({ lat:'19',lon:'' }), /invalid_location/);
